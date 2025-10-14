@@ -1,0 +1,44 @@
+param ($net="cartpole", $out="verification_model")
+$file = $net + ".onnx"
+
+echo -n "Convert $net, as found in file $file"
+cd ..
+
+echo -n "Convert from .onnx file to Rocq string..."
+cmd.exe /C "protoc --decode=onnx.ModelProto onnx.proto < $file > decoded"
+Remove-Item -Path ./net.v -ErrorAction SilentlyContinue
+python .\file_import.py decoded net.v $net
+Remove-Item -Path ./decoded -ErrorAction SilentlyContinue
+
+echo -n "Compile Rocq string..."
+coqc -w none -R ./target CoqE2EAI ./net.v -o ./target/net.vo
+
+echo -n "Convert Rocq string to Rocq instance..."
+python convert_net.py $net $out
+Remove-Item -Path ./net.v -ErrorAction SilentlyContinue
+
+echo -n "Perform input-output tests on Rocq instance..."
+cd onnx_evaluator
+python .\test_enviroment.py
+cd ..
+
+
+$out_file = $net + ".out"
+if ($out -match "verification_model")
+{	
+	echo -n "The Convertion from ONNX model to verification model is safe-by-design via proof of isomorphism!"
+	echo -n "Convert net to make it executable..."
+	$out = $net + ".v"
+	Remove-Item -Path ./$out -ErrorAction SilentlyContinue
+	python .\redirect_formatter.py $out_file $out
+	Remove-Item -Path ./$out_file -ErrorAction SilentlyContinue
+	Remove-Item -Path ./out/$out -ErrorAction SilentlyContinue
+	mv $out ./out
+}
+else{
+	Remove-Item -Path ./out/$out_file -ErrorAction SilentlyContinue
+	mv $out_file ./out
+}
+
+echo -n "All done!"
+cd scripts
