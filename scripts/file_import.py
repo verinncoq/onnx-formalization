@@ -20,7 +20,7 @@ def main():
 
     # try to open the input file, raise error when not exist
     try:
-        f = open(input_file, "r")
+        f = open(sys.path[0] + input_file, "r")
         file = f.read()
     except FileNotFoundError:
         print("The file", input_file, "does not exist.")
@@ -28,7 +28,7 @@ def main():
 
     # checks if output file already exists, if so ask user if it should be overwritten
     try:
-        out = open(output_file, "x")
+        out = open(sys.path[0] + output_file, "x")
     except FileExistsError:
         cont = input(
             "<" + output_file + "> already exists. Do you wish to continue? (<" + output_file + "> will be overwritten.) [y/n]: ")
@@ -37,7 +37,7 @@ def main():
                 print("Process has been terminated by user, no files written.")
                 return
             elif (cont == "y" or cont == "Y" or cont == "yes" or cont == "Yes"):
-                out = open(output_file, "w")
+                out = open(sys.path[0] + output_file, "w")
                 break
             else:
                 cont = input("please type <y> or <n>: ")

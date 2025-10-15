@@ -1,4 +1,4 @@
-(*this file was generated automatically by .\redirect_formatter.py on 2025-10-14 14:03:21 UTC*)
+(*this file was generated automatically by ./scripts/redirect_formatter.py on 2025-10-15 07:14:15 UTC*)
 
 (*this file was generated automatically*)
     From Coq Require Import Strings.String.
@@ -6,7 +6,7 @@
 
     From Coq Require Import Reals.
     From Coquelicot Require Import Coquelicot.
-    From CoqE2EAI Require Import piecewise_linear neuron_functions missing_lemmas.
+    From CoqE2EAI Require Import matrix_extensions piecewise_affine neuron_functions.
     From CoqE2EAI Require Import neural_networks.
     From CoqE2EAI Require Import string_to_number.
     From CoqE2EAI Require Import transpose_mult_matrix.
@@ -77,8 +77,8 @@ Definition net_two_bias := mk_colvec 2 (fun x: nat =>
   end)
   .
 
-Definition onnxGemm__zero_ := NNLinear (transpose net_zero_weight) (constmult (real_of_string "1.00000000000000000000000") net_zero_bias) input.
+Definition onnxGemm__six_ := NNLinear (transpose net_two_weight) (scalar_mult (real_of_string "1.00000000000000000000000") net_two_bias) (NNOutput (output_dim:=2)).
 
 Definition input := NNReLU onnxGemm__six_.
 
-Definition onnxGemm__six_ := NNLinear (transpose net_two_weight) (constmult (real_of_string "1.00000000000000000000000") net_two_bias) (NNOutput (output_dim:=2)).
+Definition onnxGemm__zero_ := NNLinear (transpose net_zero_weight) (scalar_mult (real_of_string "1.00000000000000000000000") net_zero_bias) input.

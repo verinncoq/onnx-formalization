@@ -197,7 +197,7 @@ Definition stringifyNNPremodel (nnseq: NNPremodel) : string :=
                          end in
     let bias_prefix := match beta with
                          | "1.0" => ""%string
-                         | _ => "(constmult (real_of_string """ ++ beta ++ """) "
+                         | _ => "(scalar_mult (real_of_string """ ++ beta ++ """) "
                          end in
     let bias_suffix := match beta with
                          | "1.0" => " "%string
@@ -241,7 +241,7 @@ Definition stringifyNNPremodelList (l: list NNPremodel) : string :=
 
     From Coq Require Import Reals.
     From Coquelicot Require Import Coquelicot.
-    From CoqE2EAI Require Import piecewise_linear neuron_functions missing_lemmas.
+    From CoqE2EAI Require Import matrix_extensions piecewise_affine neuron_functions.
     From CoqE2EAI Require Import neural_networks.
     From CoqE2EAI Require Import string_to_number.
     From CoqE2EAI Require Import transpose_mult_matrix.

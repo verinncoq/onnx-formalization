@@ -13,10 +13,10 @@ echo -n "remove old convertion functions if exists"
 Remove-Item -Path ./out/convertion_functions.v -ErrorAction SilentlyContinue
 
 echo -n "convert model to make it executable"
-python .\redirect_formatter.py model.out out/model.v
+python ./scripts/redirect_formatter.py /../model.out /../out/model.v
 
 echo -n "convert convertion functions to make them executable"
-python .\redirect_formatter.py convertion_functions.out out/convertion_functions.v
+python ./scripts/redirect_formatter.py /../convertion_functions.out /../out/convertion_functions.v
 
 echo -n "remove .out files"
 Remove-Item -Path ./model.out -ErrorAction SilentlyContinue

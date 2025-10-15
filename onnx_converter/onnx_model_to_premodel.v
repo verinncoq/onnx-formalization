@@ -339,6 +339,7 @@ Open Scope list_scope.
 
 (*
 Extracts the list of vertices (node, initializer, input and output) out of the model.
+Reverts some list for the verification model.
 Returns an empty list if no graph is found
 *)
 Definition model_proto_to_vertex_list (model: ModelProto) : list vertex :=
@@ -346,10 +347,10 @@ Definition model_proto_to_vertex_list (model: ModelProto) : list vertex :=
   | ModelProto_constructor _ _ _ _ _ _ _ graph_option _ _ _ _ => match graph_option with
     | Some graph => match graph with
       | GraphProto_constructor nodes _ initializers _ _ inputs outputs _ _ _ =>
-        (map (fun x => output x) outputs) ++
+        (map (fun x => output x) (rev outputs)) ++
         (map (fun x => input x) inputs) ++
         (map (fun x => tensor x) initializers) ++
-        (map (fun x => node x) nodes)
+        (map (fun x => node x) (rev nodes))
       end
     | None => []
     end

@@ -4,12 +4,9 @@ minimale Anpassungen im stringifyer, um pendnet.v gerecht zu werden
 schau dir binary32_of_float32 usw nochmal ganz genau an (alle Edge cases)
 
 scripte für Linux
-eigenes compile script
-eigenes repo
 
-was wird gebraucht? coq und flocq
+was wird gebraucht? coq und flocq, numpy und bibs, protoc
 
-alles kommentieren
 In Arbeit Sagen, Dass Code Kommentiert Ist Und Man Dort Lesen Soll, Wenn Man Tiefere Einblicke Erwünscht 
 
 Versuche, Int32 Und Int64 Mit CompCert zu modellieren -> möglich in Zukunft, aber die Bibliothek in nur in Linux verfügbar, deshalb machen wir das nicht

@@ -1,4 +1,4 @@
-(*this file was generated automatically by .\redirect_formatter.py on 2025-10-14 14:04:49 UTC*)
+(*this file was generated automatically by ./scripts/redirect_formatter.py on 2025-10-15 07:10:30 UTC*)
 
 
 From Coq Require Import Strings.String.

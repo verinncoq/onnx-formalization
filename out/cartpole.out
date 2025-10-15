@@ -2,11 +2,11 @@
          (ModelProto_constructor
             (Some
                (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                Byte.x00, Byte.x04))
+               Byte.x00, Byte.x04))
             (OperatorSetIdProto_constructor None
                (Some
                   (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                   Byte.x00, Byte.x00, Byte.x09)) :: nil)
+                  Byte.x00, Byte.x00, Byte.x09)) :: nil) 
             (Some """pytorch""") (Some """1.11.0""") None None None
             (Some
                (GraphProto_constructor
@@ -128,7 +128,7 @@
                               (Some INT_AttributeProto) None
                               (Some
                                  (Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                                  Byte.x00, Byte.x00, Byte.x00, Byte.x01))
+                                 Byte.x00, Byte.x00, Byte.x00, Byte.x01))
                               None None None None nil nil nil nil nil nil
                             :: nil) None nil nil
                    :: NodeProto_constructor ("""input""" :: nil)
@@ -257,15 +257,15 @@
                                     (Some INT_AttributeProto) None
                                     (Some
                                        (Byte.x00, Byte.x00, Byte.x00,
-                                        Byte.x00, Byte.x00, Byte.x00,
-                                        Byte.x00, Byte.x01)) None None None
+                                       Byte.x00, Byte.x00, Byte.x00,
+                                       Byte.x00, Byte.x01)) None None None
                                     None nil nil nil nil nil nil :: nil) None
                            nil nil :: nil) (Some """torch-jit-export""")
                   (TensorProto_constructor
                      ((Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                       Byte.x00, Byte.x00, Byte.x04)
+                      Byte.x00, Byte.x00, Byte.x04)
                       :: (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                          Byte.x00, Byte.x00, Byte.x04) :: nil)
+                         Byte.x00, Byte.x00, Byte.x04) :: nil)
                      (Some (Byte.x00, Byte.x00, Byte.x00, Byte.x01)) None nil
                      nil nil nil (Some """net.0.weight""") None
                      (Some
@@ -330,7 +330,7 @@
                      nil nil nil
                    :: TensorProto_constructor
                         ((Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                          Byte.x00, Byte.x00, Byte.x04) :: nil)
+                         Byte.x00, Byte.x00, Byte.x04) :: nil)
                         (Some (Byte.x00, Byte.x00, Byte.x00, Byte.x01)) None
                         nil nil nil nil (Some """net.0.bias""") None
                         (Some
@@ -360,10 +360,9 @@
                         nil nil nil
                       :: TensorProto_constructor
                            ((Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                             Byte.x00, Byte.x00, Byte.x00, Byte.x02)
+                            Byte.x00, Byte.x00, Byte.x00, Byte.x02)
                             :: (Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                                Byte.x00, Byte.x00, Byte.x00, Byte.x04)
-                               :: nil)
+                               Byte.x00, Byte.x00, Byte.x00, Byte.x04) :: nil)
                            (Some (Byte.x00, Byte.x00, Byte.x00, Byte.x01))
                            None nil nil nil nil (Some """net.2.weight""")
                            None
@@ -427,8 +426,7 @@
                            nil nil nil
                          :: TensorProto_constructor
                               ((Byte.x00, Byte.x00, Byte.x00, Byte.x00,
-                                Byte.x00, Byte.x00, Byte.x00, Byte.x02)
-                               :: nil)
+                               Byte.x00, Byte.x00, Byte.x00, Byte.x02) :: nil)
                               (Some (Byte.x00, Byte.x00, Byte.x00, Byte.x01))
                               None nil nil nil nil 
                               (Some """net.2.bias""") None
@@ -451,7 +449,7 @@
                                  (Tensor_TypeProto_constructor
                                     (Some
                                        (Byte.x00, Byte.x00, Byte.x00,
-                                        Byte.x01))
+                                       Byte.x01))
                                     (Some
                                        (TensorShapeProto_constructor
                                           (Dimension_TensorShapeProto_constructor
@@ -478,7 +476,7 @@
                                  (Tensor_TypeProto_constructor
                                     (Some
                                        (Byte.x00, Byte.x00, Byte.x00,
-                                        Byte.x01))
+                                       Byte.x01))
                                     (Some
                                        (TensorShapeProto_constructor
                                           (Dimension_TensorShapeProto_constructor

@@ -1,12 +1,14 @@
 cd ..
 
+mkdir target -ErrorAction SilentlyContinue
+
 echo "Compile external files..."
-<#
+
 coqc -w none -R ./target CoqE2EAI ./external/theorems.v -o ./target/theorems.vo
 coqc -w none -R ./target CoqE2EAI ./external/eqb_la.v -o ./target/eqb_la.vo
-coqc -w none -R ./target CoqE2EAI ./external/inb.v -o ./target/inb.vo
 coqc -w none -R ./target CoqE2EAI ./external/error_option.v -o ./target/error_option.vo
 coqc -w none -R ./target CoqE2EAI ./external/string_tree.v -o ./target/string_tree.vo
+coqc -w none -R ./target CoqE2EAI ./external/inb.v -o ./target/inb.vo
 coqc -w none -R ./target CoqE2EAI ./external/grab.v -o ./target/grab.vo
 coqc -w none -R ./target CoqE2EAI ./external/stringifyN.v -o ./target/stringifyN.vo
 coqc -w none -R ./target CoqE2EAI ./external/string_to_number.v -o ./target/string_to_number.vo
@@ -23,10 +25,15 @@ coqc -w none -R ./target CoqE2EAI ./external/listStringToString.v -o ./target/li
 coqc -w none -R ./target CoqE2EAI ./external/whitelist.v -o ./target/whitelist.vo
 coqc -w none -R ./target CoqE2EAI ./external/count_nodes.v -o ./target/count_nodes.vo
 coqc -w none -R ./target CoqE2EAI ./external/filter.v -o ./target/filter.vo
-#>
 coqc -w none -R ./target CoqE2EAI ./external/stringifyNNSequential.v -o ./target/stringifyNNSequential.vo
-<#
-echo "Compile Protobuf Converter ..."
+coqc -w none -R ./target CoqE2EAI ./external/matrix_extensions.v -o ./target/matrix_extensions.vo
+coqc -w none -R ./target CoqE2EAI ./external/piecewise_affine.v -o ./target/piecewise_affine.vo
+coqc -w none -R ./target CoqE2EAI ./external/pwaf_operations.v -o ./target/pwaf_operations.vo
+coqc -w none -R ./target CoqE2EAI ./external/neuron_functions.v -o ./target/neuron_functions.vo
+coqc -w none -R ./target CoqE2EAI ./external/neural_networks.v -o ./target/neural_networks.vo
+coqc -w none -R ./target CoqE2EAI ./external/transpose_mult_matrix.v -o ./target/transpose_mult_matrix.vo
+
+echo "Compile Protobuf Converter..."
 coqc -w none -R ./target CoqE2EAI ./protobuf_converter/preprocessor.v -o ./target/preprocessor.vo
 coqc -w none -R ./target CoqE2EAI ./protobuf_converter/tokenizer_protobuf.v -o ./target/tokenizer_protobuf.vo
 coqc -w none -R ./target CoqE2EAI ./protobuf_converter/parser_protobuf.v -o ./target/parser_protobuf.vo
@@ -45,17 +52,17 @@ cd scripts
 ./formalize.ps1
 cd ..
 
-#>
 
-echo "Compile ONNX Converter ..."
-coqc -w none -R ./target CoqE2EAI ./onnx_converter/bytes_converter.v -o ./target/bytes_converter.vo
+
+echo "Compile ONNX Converter..."
 coqc -w none -R ./target CoqE2EAI ./onnx_converter/bytes_decoder.v -o ./target/bytes_decoder.vo
+coqc -w none -R ./target CoqE2EAI ./onnx_converter/bytes_converter.v -o ./target/bytes_converter.vo
 coqc -w none -R ./target CoqE2EAI ./onnx_converter/onnx_model_to_premodel.v -o ./target/onnx_model_to_premodel.vo
 coqc -w none -R ./target CoqE2EAI ./onnx_converter/onnx_converter.v -o ./target/onnx_converter.vo
 echo "Verifiy ONNX Converter ..."
 coqc -w none -R ./target CoqE2EAI ./onnx_converter/isomorphism.v -o ./target/isomorphism.vo
 
-echo "Compile ONNX Evaluator ..."
+echo "Compile ONNX Evaluator..."
 coqc -w none -R ./target CoqE2EAI ./onnx_evaluator/matrices.v -o ./target/matrices.vo
 coqc -w none -R ./target CoqE2EAI ./onnx_evaluator/operations/gemm.v -o ./target/gemm.vo
 coqc -w none -R ./target CoqE2EAI ./onnx_evaluator/operations/relu.v -o ./target/relu.vo
