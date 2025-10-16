@@ -1,0 +1,21 @@
+model source: https://github.com/onnx/models
+adv_inception_v3_Opset16.onnx
+alexnet_Opset17.onnx
+bat_resnext26ts_Opset18.onnx
+beit_large_patch16_224_Opset17.onnx
+bert_Opset18.onnx
+bigbird_Opset18.onnx
+botnet26t_256_Opset18.onnx
+cait_xxs36_384_Opset18.onnx
+camembert_Opset18.onnx
+coat_tiny_Opset18.onnx
+electra_Opset18.onnx
+feastconv_Opset18.onnx
+funnel_Opset18.onnx, gpt2-10.onnx
+gptneox_Opset18.onnx
+leconv_Opset17.onnx
+nezha_Opset18.onnx
+resgatedgraphconv_Opset17.onnx
+roberta_Opset18.onnx
+sageconv_Opset18.onnx
+tagconv_Opset18.onnx

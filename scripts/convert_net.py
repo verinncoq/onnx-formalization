@@ -44,6 +44,3 @@ os.remove("convert_net.v")
 os.remove("convert_net.vo")
 os.remove("convert_net.vok")
 os.remove("convert_net.vos")
-
-
-# format output

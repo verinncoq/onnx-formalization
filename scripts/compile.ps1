@@ -27,6 +27,7 @@ coqc -w none -R ./target CoqE2EAI ./external/count_nodes.v -o ./target/count_nod
 coqc -w none -R ./target CoqE2EAI ./external/filter.v -o ./target/filter.vo
 coqc -w none -R ./target CoqE2EAI ./external/stringifyNNSequential.v -o ./target/stringifyNNSequential.vo
 coqc -w none -R ./target CoqE2EAI ./external/matrix_extensions.v -o ./target/matrix_extensions.vo
+coqc -w none -R ./target CoqE2EAI ./external/leos_additions.v -o ./target/leos_additions.vo
 coqc -w none -R ./target CoqE2EAI ./external/piecewise_affine.v -o ./target/piecewise_affine.vo
 coqc -w none -R ./target CoqE2EAI ./external/pwaf_operations.v -o ./target/pwaf_operations.vo
 coqc -w none -R ./target CoqE2EAI ./external/neuron_functions.v -o ./target/neuron_functions.vo

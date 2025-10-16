@@ -91,7 +91,6 @@ for evaluation, inputs_per_evaluation in enumerate(inputs):
     roqc_file += f"Compute onnx_evaluator_wrapper_reformatter (evaluate {model_name} inputs_{evaluation}).\n\n"
 
 # write file
-
 with open("evaluations.v", "w") as f:
     f.write(roqc_file)
 
