@@ -1,4 +1,4 @@
-param ($net="cartpole", $out="verification_model")
+param ($net="cartpole", $out="verification_model", $evaluations="10")
 $file = $net + ".onnx"
 
 echo -n "Convert $net, as found in file $file"
@@ -13,13 +13,14 @@ Remove-Item -Path ./decoded -ErrorAction SilentlyContinue
 echo -n "Compile Rocq string..."
 coqc -w none -R ./target CoqE2EAI ./net.v -o ./target/net.vo
 
-echo -n "Convert Rocq string to Rocq instance..."
+echo -n "Apply ONNX Converter..."
 python ./scripts/convert_net.py $net $out
 Remove-Item -Path ./net.v -ErrorAction SilentlyContinue
 
-echo -n "Perform input-output tests on Rocq instance..."
+echo -n "Perform $evaluations input-output tests on Rocq instance..."
 cd onnx_evaluator
-python test_enviroment.py
+$model_path = "../" + $file
+python test_enviroment.py $evaluations $model_path
 cd ..
 
 

@@ -15,13 +15,14 @@ Fixpoint Inb (l: list string)(s: string) : bool :=
     else Inb m s
   end.
 
-(*for a given list Structure, it returnes all the names of messages defined in it, excluding nested ones*)
+(*for a given list Structure, it returnes all the names of structures defined in it, excluding nested ones*)
 Fixpoint defined_message_names (defined: list Structure) : list string :=
   match defined with
   | [] => []
   | h::t => match h with
+	| enum name _ => name :: defined_message_names t
+	| oneof name _ => name :: defined_message_names t
     | message name _ _ => name :: defined_message_names t
-    | _ => defined_message_names t
     end
   end.
 
@@ -170,7 +171,7 @@ Fixpoint depth (s: Structure) : nat :=
 
 (*calls sort_structures_recursive, with initializing arguments*)
 Definition sort_structures (input: list Structure) : error_option (list Structure) :=
-  let n_max := fold_left max (map longest_list_structure input) 0 in
+  let n_max := longest_list_structure (message "" input []) in
   let d_max := fold_left max (map depth input) 0 in
   let depth := (square n_max) * (d_max + 1) in
   sort_structures_recursive depth input [] [].
