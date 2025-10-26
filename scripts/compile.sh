@@ -1,6 +1,6 @@
 cd ..
 
-mkdir target -ErrorAction SilentlyContinue
+mkdir target -p foo
 
 echo "Compile external files..."
 
@@ -50,7 +50,7 @@ coqc -w none -R ./target CoqE2EAI ./protobuf_converter/function_converter.v -o .
 
 echo "Convert ONNX Syntax..."
 cd scripts
-./formalize.ps1
+./formalize.sh
 cd ..
 
 

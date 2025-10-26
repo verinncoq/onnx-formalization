@@ -1,4 +1,4 @@
-From Coq Require Import Nat Reals List Arith Lia Lra.
+From Coq Require Import Nat ZArith Reals List Arith Lia Lra.
 
 Open Scope nat_scope.
 
@@ -17,3 +17,9 @@ Proof. intros. destruct n.
 - reflexivity.
 - inversion H.
 Qed.
+
+Open Scope Z_scope.
+Lemma Zlt_succ_le n m : n < Z.succ m -> n <= m.
+Proof. intros. apply Z.lt_succ_r. apply H.
+Qed.
+Close Scope Z_scope.

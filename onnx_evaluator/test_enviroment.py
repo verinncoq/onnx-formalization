@@ -116,6 +116,7 @@ def reformat_coqc_out(b: bytes):
         result = result.replace(": error_option string", "")
         result = result.replace('"', "")
         result = result.replace("'", "")
+        result = result.replace("\\n", "")
         result = result.strip()
         t = eval(result)
         out.append(t)

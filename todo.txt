@@ -1,11 +1,11 @@
-merke dir, dass du die Funktion Z_of_string geschrieben hast
+scripte für Linux -> alle drei
+Kompilierung auf Windows VM
+README schreiben
 
-minimale Anpassungen im stringifyer, um pendnet.v gerecht zu werden
-schau dir binary32_of_float32 usw nochmal ganz genau an (alle Edge cases)
+EXPOSEE Abchecken, ob alles gemacht wurde
 
-scripte für Linux
-In Arbeit Sagen, Dass Code Kommentiert Ist Und Man Dort Lesen Soll, Wenn Man Tiefere Einblicke Erwünscht 
+https://tu-berlin.zoom-x.de/my/voellingerkim?pwd=OGhpcngxVmJMVll1dkZ4K0U4ME1vUT09
+------------------------------------------------------------------------
 
-Versuche, Int32 Und Int64 Mit CompCert zu modellieren -> möglich in Zukunft, aber die Bibliothek in nur in Linux verfügbar, deshalb machen wir das nicht
-Verweise im Future Work Auf Die Erstellung Der Analysephase Mittels Einer Grammatik -> ONNX definiert auch eine (experimental, deshalb nicht genutzt)
+https://orga.mtv.tu-berlin.de/5r6lqwI3S-maZgyjolG9yg?both#
 

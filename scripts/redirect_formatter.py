@@ -42,16 +42,7 @@ def main():
     try:
         out = open(sys.path[0] + output_file, "x")
     except FileExistsError:
-        cont = input("<" + output_file + "> already exists. Do you wish to continue? (<" + output_file + "> will be overwritten.) [y/n]: ")
-        while(True):
-            if(cont == "n" or cont == "N" or cont == "no" or cont == "No"):
-                print("Process has been terminated by user, no files written.")
-                return
-            elif(cont == "y" or cont == "Y" or cont == "yes" or cont == "Yes"):
-                out = open(sys.path[0] + output_file, "w")
-                break
-            else:
-                cont = input("please type <y> or <n>: ")
+        out = open(sys.path[0] + output_file, "w")
 
 
     #un-double the quotation mark, so Rocq interprets them as string endings again
