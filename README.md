@@ -27,3 +27,7 @@ To compile, run `scripts/compile.sh` resp. `scripts/compile.ps1`. You can also m
 * To use the ONNX-Evaluator, you may have a look at the file `onnx_evaluator/usage.v`.
 * To use the updated [verified converter](https://github.com/verinncoq/converter), you may run `./scripts/convert.sh -n input` resp. `scripts/convert.ps1 -net input`, where `input.onnx` must be an ONNX-file.
 You may also run `./scripts/convert.sh -n input -o onnx_model` resp. `scripts/convert.ps1 -net input -out onnx_model` to get an instance of the ONNX-Model.
+
+## Flowchart
+
+![](diagram.drawio.png)
