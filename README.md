@@ -16,6 +16,10 @@ It is found in the folder `onnx_converter`.
 * Python 3.11.2
 * numpy 1.25.0
 * onnxruntime 1.15.1
+ 
+Python packages for experiments:
+* torch 2.9.1 and torchvision 0.24.1
+* onnx 1.20.0 and onnxscript 0.5.7
 
 ## Build
 
