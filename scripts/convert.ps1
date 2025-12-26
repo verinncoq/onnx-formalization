@@ -1,5 +1,4 @@
-param ($net="cartpole", $out="verification_model", $evaluations="10")
-$file = $net + ".onnx"
+param ($net="cartpole", $file=$net + ".onnx", $out="verification_model", $evaluations="10")
 
 echo -n "Convert $net, as found in file $file"
 cd ..
@@ -19,8 +18,8 @@ Remove-Item -Path ./net.v -ErrorAction SilentlyContinue
 
 echo -n "Perform $evaluations input-output tests on Rocq instance..."
 cd onnx_evaluator
-$model_path = "../" + $file
-python test_enviroment.py $evaluations $model_path
+$model_path = $file
+python test_enviroment.py $evaluations $model_path $net
 cd ..
 
 

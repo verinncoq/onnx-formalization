@@ -12,18 +12,16 @@ model_name = "cartpole"  # name of the model, which must be defined as a string 
 
 
 # exactly one argument is invalid
-if len(sys.argv) == 2:
-    print(f"Please give either zero parameters or more than one (sys.argv[0] <number_evaluations> <model_path> <input_names>).")
+if len(sys.argv) <= 3:
+    print(f"Please give either zero parameters or more than one (sys.argv[0] <number_evaluations> <model_path> <neural_network_name>).")
     exit()
 
 # if more than one argument is given
-if len(sys.argv) > 2:
+if len(sys.argv) > 3:
     # use parameters from command line inputs
     evaluations = int(sys.argv[1])
     model_path = sys.argv[2]
-    model_name = model_path.split("/")[-1].replace(".onnx", "")
-
-
+    model_name = sys.argv[3]
 
 
 session = ort.InferenceSession(model_path)  # set up a runtime session
