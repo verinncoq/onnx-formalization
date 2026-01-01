@@ -14,14 +14,12 @@ From CoqE2EAI Require Export type_converter.
 
 (*combines a type and a label (both given as a string)*)
 Inductive TypeLabelPair :=
-  | typelabelpair: string (*type*) -> string (*label*)-> TypeLabelPair
-  .
+  | typelabelpair: string (*type*) -> string (*label*)-> TypeLabelPair.
 
 (*one half of the protobuf model in rocq: field element with the cardinality as a constructor*)
 Inductive Field :=
   | optional: TypeLabelPair -> Field
-  | repeated: TypeLabelPair -> Field
-  .
+  | repeated: TypeLabelPair -> Field.
 
 (*
 One half of the protobuf model in rocq.
@@ -32,8 +30,7 @@ Message: name, list of structures (nested messages, oneofs and enums), list of f
 Inductive Structure :=
   | enum: string -> list TypeLabelPair -> Structure
   | oneof: string -> list TypeLabelPair -> Structure
-  | message: string -> list Structure -> list Field -> Structure
-  .
+  | message: string -> list Structure -> list Field -> Structure.
 
 
 (*helpers*)
