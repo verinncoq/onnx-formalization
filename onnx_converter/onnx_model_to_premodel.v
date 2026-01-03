@@ -16,8 +16,7 @@ Inductive vertex :=
 | node: NodeProto -> vertex
 | tensor: TensorProto -> vertex
 | input: ValueInfoProto -> vertex
-| output: ValueInfoProto -> vertex
-.
+| output: ValueInfoProto -> vertex.
 
 Open Scope string_scope.
 
