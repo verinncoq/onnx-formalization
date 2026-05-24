@@ -1,4 +1,4 @@
-# A formalization of the ONNX-format in Rocq for the verification of neural networks
+# A Formalization of the Syntax and Semantics of the ONNX Core Format in Rocq: A Rigorous Foundation for Execution-Safe Verification of Neural Networks
 
 The formalization comes in two parts: The formalization of the ONNX-syntax and the formalization of the ONNX-semantics.
 
