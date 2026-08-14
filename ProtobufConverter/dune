@@ -1,0 +1,5 @@
+(rocq.theory
+  (name ONNXFormalization.ProtobufConverter)
+  (synopsis "Protobuf to ONNX IR converter")
+  (theories Stdlib Coquelicot mathcomp HB Flocq elpi elpi_elpi ONNXFormalization.External)
+  (package onnxformalization))

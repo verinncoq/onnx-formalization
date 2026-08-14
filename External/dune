@@ -1,0 +1,4 @@
+(rocq.theory
+  (name ONNXFormalization.External)
+  (theories Stdlib Coquelicot mathcomp HB elpi elpi_elpi)
+  (package onnxformalization))
