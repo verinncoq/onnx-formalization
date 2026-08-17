@@ -9,7 +9,7 @@
 
 (authors "Leo Gummersbach" "Andrei Aleksandrov" "Kim Völlinger")
 
-(maintainers "Andrei Aleksandrov" "Kim Völlinger")
+(maintainers "Andrei Aleksandrov" "Kim Völlinger" "Alessandro Bruni" "Alistair Sirman")
 
 (license APACHE-2.0)
 
