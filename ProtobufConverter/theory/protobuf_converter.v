@@ -31,9 +31,3 @@ Definition protobuf_function_converter (max_depth: nat) (s: string) : string :=
   | Success IR => function_converter IR
   | Error e => e
   end.
-
-From CoqE2EAI Require Export proto.
-
-
-Redirect "model" Compute protobuf_model_converter 2000 proto.
-Redirect "convertion_functions" Compute protobuf_function_converter 2000 proto.

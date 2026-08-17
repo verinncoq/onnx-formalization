@@ -1,0 +1,4 @@
+(executable
+  (name protobuf_converter_runner)
+  (modules protobuf_converter_runner)
+  (libraries stdlib unix protobuf_converter_extracted))
