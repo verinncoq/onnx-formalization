@@ -1,0 +1,7 @@
+(rocq.extraction
+ (prelude protobuf_extraction)
+ (extracted_modules rocq_protobuf)
+ (theories Stdlib ONNXFormalization.External ONNXFormalization.ProtobufConverter))
+
+(executable
+  (name rocq_protobuf_runner))

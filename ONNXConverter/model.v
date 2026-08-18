@@ -1,6 +1,4 @@
-(*this file was generated automatically by ./scripts/redirect_formatter.py on 2025-10-26 10:43:41 UTC*)
-
-(*This file was generated automatically*)
+(* This file was generated automatically by ProtobufConverter *)
 
 From Stdlib Require Import Strings.String.
 From Stdlib Require Import Lists.List. Import ListNotations.

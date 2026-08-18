@@ -64,13 +64,13 @@ Fixpoint convert_structure (structure: Structure) : string :=
 
 (*Applies convert_structure on all structures, adding all the necessary imports*)
 Definition model_converter (l: list Structure) : string :=
-  add_linefeed "(*This file was generated automatically*)" ++
+  add_linefeed "(* This file was generated automatically by ProtobufConverter *)" ++
   add_linefeed "" ++
   add_linefeed "From Stdlib Require Import Strings.String." ++
   add_linefeed "From Stdlib Require Import Lists.List. Import ListNotations." ++
-  add_linefeed "From CoqE2EAI Require Export float." ++
-  add_linefeed "From CoqE2EAI Require Export int." ++
-  add_linefeed "From CoqE2EAI Require Export bytes." ++
+  add_linefeed "From ONNXFormalization.ProtobufDatatypes Require Export float." ++
+  add_linefeed "From ONNXFormalization.ProtobufDatatypes Require Export int." ++
+  add_linefeed "From ONNXFormalization.ProtobufDatatypes Require Export bytes." ++
   add_linefeed "" ++
   fold_left append (map convert_structure l) ""
   .

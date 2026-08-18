@@ -141,8 +141,8 @@ Fixpoint message_constructor_arguments (l: list Field) : string :=
   match l with
   | [] => ""
   | h::t => let name := match h with
-    | optional (typelabelpair type label) => match label with | "" => "e" | l => l end (*in case of an empty label, this must belong to an enum*)
-    | repeated (typelabelpair type label) => match label with | "" => "e" | l => l end (*in case of an empty label, this must belong to an enum*)
+    | optional (typelabelpair type label) => if label =? "" then "e" else label (*in case of an empty label, this must belong to an enum*)
+    | repeated (typelabelpair type label) => if label =? "" then "e" else label (*in case of an empty label, this must belong to an enum*)
     end in
     add_linefeed name ++ message_constructor_arguments t
   end.
@@ -166,8 +166,8 @@ Fixpoint field_to_convertion_function (l1 l2: list Field) (name: string) : strin
     (*let-and-match*)
 
     | optional (typelabelpair type label) =>
-	  let label_replacement := match label with | "" => "e" | l => l end in (*in case of an empty label, this must belong to an enum*)
-	  let label := match label with | "" => "" | _ => """" ++ (undo_rename_reserved_keyword label) ++ """" end in (*in case of an empty label, this must belong to an enum*)
+	  let label_replacement := if label =? "" then "e" else label in (*in case of an empty label, this must belong to an enum*)
+	  let label := if label =? "" then "" else """" ++ (undo_rename_reserved_keyword label) ++ """" in (*in case of an empty label, this must belong to an enum*)
       match is_basic_type type with 
       | true =>
         "let " ++ label_replacement ++ "_option := option_option_handler " ++ get_string_converter type ++
@@ -180,8 +180,8 @@ Fixpoint field_to_convertion_function (l1 l2: list Field) (name: string) : strin
       end
 
     | repeated (typelabelpair type label) =>
-	  let label_replacement := match label with | "" => "e" | l => l end in (*in case of an empty label, this must belong to an enum*)
-	  let label := match label with | "" => "" | _ => """" ++ (undo_rename_reserved_keyword label) ++ """" end in (*in case of an empty label, this must belong to an enum*)
+	  let label_replacement := if label =? "" then "e" else label in (*in case of an empty label, this must belong to an enum*)
+	  let label := if label =? "" then "" else """" ++ (undo_rename_reserved_keyword label) ++ """" in (*in case of an empty label, this must belong to an enum*)
       match is_basic_type type with 
       | true =>
         "let " ++ label_replacement ++ "_option := option_list_handler " ++ get_string_converter type ++
@@ -278,19 +278,21 @@ Fixpoint structure_to_convertion_function (s: Structure) : string :=
   end.
 
 (*necessary imports*)
-Definition pre := "
-From Stdlib Require Import Strings.String.
-From Stdlib Require Import Lists.List. Import ListNotations.
-
-From CoqE2EAI Require Export grab.
-From CoqE2EAI Require Export string_to_number.
-From CoqE2EAI Require Export model.
-From CoqE2EAI Require Export float.
-From CoqE2EAI Require Export int.
-From CoqE2EAI Require Export bytes.
-From CoqE2EAI Require Export function_converter.
-
-".
+(* If the line does not start with an identidier, Dune may treat these as genuine imports *)
+Definition pre :=
+add_linefeed "(* This file was generated automatically by ProtobufConverter *)" ++
+add_linefeed "" ++
+add_linefeed "From Stdlib Require Import Strings.String." ++
+add_linefeed "From Stdlib Require Import Lists.List. Import ListNotations." ++
+add_linefeed "From ONNXFormalization.External Require Export grab." ++
+add_linefeed "From ONNXFormalization.External Require Export string_to_number." ++
+add_linefeed "From ONNXFormalization.ProtobufDatatypes Require Export float." ++
+add_linefeed "From ONNXFormalization.ProtobufDatatypes Require Export int." ++
+add_linefeed "From ONNXFormalization.ProtobufDatatypes Require Export bytes." ++
+add_linefeed "From ONNXFormalization.ProtobufConverter Require Export function_converter." ++
+add_linefeed "From ONNXFormalization.ONNXConverter Require Export model." ++
+add_linefeed "" ++
+add_linefeed "Open Scope string_scope.".
 
 (*maps the <structure_to_convertion_function> on the list and appends the necessary imports*)
 Definition function_converter (IR: list Structure) : string :=

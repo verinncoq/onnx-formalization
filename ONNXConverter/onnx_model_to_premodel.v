@@ -9,7 +9,7 @@ From ONNXFormalization.External Require Export convert_matrix.
 From ONNXFormalization.External Require Export intermediate_representation.
 
 From ONNXFormalization.ONNXConverter Require Export model.
-From ONNXFormalization.ONNXConverter Require Export convertion_functions.
+From ONNXFormalization.ONNXConverter Require Export conversion_functions.
 From ONNXFormalization.ONNXConverter Require Export bytes_converter.
 
 

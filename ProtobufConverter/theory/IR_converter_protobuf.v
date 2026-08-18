@@ -68,13 +68,11 @@ Fixpoint convert_enum_children (c: list tree) (convert: bool) : list TypeLabelPa
   | [] => []
   | tree::c' =>
     let name := match tree with | leaf s => (string_of_list_ascii s) | subtree s _ => (string_of_list_ascii s) end in
-    match name with
-    | ";" => convert_enum_children c' true (*scan again*)
-    | _ => match convert with
-           | true => (typelabelpair name name) :: (convert_enum_children c' false)
-           | false => convert_enum_children c' false
-           end
-    end
+    if eqb name ";" then convert_enum_children c' true (*scan again*)
+    else match convert with
+         | true => (typelabelpair name name) :: (convert_enum_children c' false)
+         | false => convert_enum_children c' false
+         end
   end.
 
 (*takes a list of trees that are children of a oneof node's name*)
@@ -84,9 +82,8 @@ Fixpoint convert_oneof_children (c: list tree) (convert: bool) : list (error_opt
   | [] => []
   | tree::c' =>
     let name := match tree with | leaf s => (string_of_list_ascii s) | subtree s _ => (string_of_list_ascii s) end in
-    match name with
-    | ";" => convert_oneof_children c' true (*scan again*)
-    | _ => match convert with
+    if eqb name ";" then convert_oneof_children c' true (*scan again*)
+    else match convert with
       | true => match c' with
         | [] => [Error "found a type, but not a label"]
         | label_tree::c'' => let label := match label_tree with | leaf s => (string_of_list_ascii s) | subtree s _ => (string_of_list_ascii s) end in
@@ -94,7 +91,6 @@ Fixpoint convert_oneof_children (c: list tree) (convert: bool) : list (error_opt
         end
         | false => convert_oneof_children c' false
       end
-    end
   end.
 
 (*adds the message name at the end of the type of the pair*)
@@ -185,9 +181,9 @@ Fixpoint convert_message_children (c: list tree) (convert: bool) (max_depth: nat
     | [] => ([], [])
     | tree::c' =>
       let name := match tree with | leaf s => (string_of_list_ascii s) | subtree s _ => (string_of_list_ascii s) end in
-      match name with
-      | ";" => convert_message_children c' true n (*scan again*)
-      | "enum" => match tree with
+      if eqb name ";" then convert_message_children c' true n else (*scan again*)
+      if eqb name "enum" then 
+        match tree with
         | leaf _ => ([Error "enum must not be empty tree"],[])
         | subtree _ [] => ([Error "enum must not be empty tree"],[])
         | subtree _ (enum_name_tree::[]) => match enum_name_tree with
@@ -199,7 +195,9 @@ Fixpoint convert_message_children (c: list tree) (convert: bool) (max_depth: nat
           end
         | subtree _ _ => ([Error "enum must have exactly one child"],[])
         end
-      | "oneof" => match tree with
+      else
+      if eqb name "oneof" then 
+      match tree with
         | leaf _ => ([Error "oneof must not be empty tree"],[])
         | subtree _ [] => ([Error "oneof must not be empty tree"],[])
         | subtree _ (oneof_name_tree::[]) => match oneof_name_tree with
@@ -218,7 +216,9 @@ Fixpoint convert_message_children (c: list tree) (convert: bool) (max_depth: nat
           end
         | subtree _ _ => ([Error "oneof must have exactly one child"],[])
         end
-      | "message" => match tree with
+      else
+      if eqb name "message" then 
+      match tree with
         | leaf _ => ([Error "message must not be empty tree"],[])
         | subtree _ [] => ([Error "message must not be empty tree"],[])
         | subtree _ (message_name_tree::[]) => match message_name_tree with
@@ -245,7 +245,8 @@ Fixpoint convert_message_children (c: list tree) (convert: bool) (max_depth: nat
           end
         | subtree _ _ => ([Error "message must have exactly one child"],[])
         end
-      | _ => match convert with
+      else 
+      match convert with
         | true => let field_cardinality := name in
           match c' with
           | [] => ([Error ("After a field cardinality (optional, repeated) must be a valid type: "++name)],[])
@@ -253,17 +254,19 @@ Fixpoint convert_message_children (c: list tree) (convert: bool) (max_depth: nat
           | field_type_tree :: field_name_tree :: c'' => 
             let field_type := match field_type_tree with | leaf s => (string_of_list_ascii s) | subtree s _ => (string_of_list_ascii s) end in
             let field_name := match field_name_tree with | leaf s => (string_of_list_ascii s) | subtree s _ => (string_of_list_ascii s) end in
-            match field_cardinality with
-            | "reserved" => convert_message_children c'' false n (*reserved is not handled by rocq*)
-            | "optional" => app_at_second (Success (optional (typelabelpair field_type field_name))) (convert_message_children c'' false n)
-            | "repeated" => app_at_second (Success (repeated (typelabelpair field_type field_name))) (convert_message_children c'' false n)
-            | other => ([Error ("A field cardinality must be reserved, optional or repeated, " ++ other ++ " was given.")],[])
-            end
+            if eqb field_cardinality "reserved"
+              then convert_message_children c'' false n (*reserved is not handled by rocq*)
+              else
+            if eqb field_cardinality "optional" 
+              then app_at_second (Success (optional (typelabelpair field_type field_name))) (convert_message_children c'' false n)
+              else
+            if eqb field_cardinality "repeated" 
+              then app_at_second (Success (repeated (typelabelpair field_type field_name))) (convert_message_children c'' false n)
+              else ([Error ("A field cardinality must be reserved, optional or repeated, " ++ field_cardinality ++ " was given.")],[])
           end
         | false => convert_message_children c' false n
         end
       end
-    end
   end.
 
 (*
@@ -297,8 +300,7 @@ Definition convert_to_IR (max_depth: nat) (t: tree) : error_option Structure :=
   | leaf _ => Error "Main node not found. Well defined syntaxtree must begin with a message named <main>!"
   | subtree _ [] => Error "Main node not found. Well defined syntaxtree must begin with a message named <main>!"
   | subtree n children => let name := (string_of_list_ascii n) in
-    match name with
-    | "message" =>
+    if eqb name "message" then
       match children with
       | [] => Error "Main node not found. Well defined syntaxtree must begin with a message named <main>!"
       | h::[] => (*when seeing message node, first child should be the name, which must be <main>*)
@@ -306,13 +308,11 @@ Definition convert_to_IR (max_depth: nat) (t: tree) : error_option Structure :=
         | leaf _ => Error "Main node should never be a leaf node."
         | subtree _ [] => Error "Main node should never be a leaf node."
         | subtree n' _ => let name' := (string_of_list_ascii n') in
-          match name' with
-          | "main" => convert_message h max_depth
-          | _ => Error "Main node not found. Well defined syntaxtree must begin with a message named <main>!"
-          end
+          if eqb name' "main" 
+            then convert_message h max_depth
+            else Error "Main node not found. Well defined syntaxtree must begin with a message named <main>!"
         end
       | _ => Error "More than one children in first message node"
       end
-    | e => Error ("Found Keyword" ++ e ++ ". Well defined syntaxtree must begin with a message named <main>!")
-    end
+    else Error ("Found Keyword" ++ name ++ ". Well defined syntaxtree must begin with a message named <main>!")
   end.

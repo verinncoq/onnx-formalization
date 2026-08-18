@@ -1,17 +1,13 @@
-(*this file was generated automatically by ./scripts/redirect_formatter.py on 2025-10-26 10:43:41 UTC*)
+(* This file was generated automatically by ProtobufConverter *)
 
 From Stdlib Require Import Strings.String.
 From Stdlib Require Import Lists.List. Import ListNotations.
-
 From ONNXFormalization.External Require Export grab.
 From ONNXFormalization.External Require Export string_to_number.
-
 From ONNXFormalization.ProtobufDatatypes Require Export float.
 From ONNXFormalization.ProtobufDatatypes Require Export int.
 From ONNXFormalization.ProtobufDatatypes Require Export bytes.
-
 From ONNXFormalization.ProtobufConverter Require Export function_converter.
-
 From ONNXFormalization.ONNXConverter Require Export model.
 
 Open Scope string_scope.

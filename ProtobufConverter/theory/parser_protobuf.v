@@ -18,24 +18,24 @@ Fixpoint parse_recursive (built_tree: tree) (todo_list: list string) (depth: nat
   match todo_list with
   | [] => built_tree (*nothing more todo, tree will be returned*)
   | active_token::todo_list' =>
-    match active_token with
-
-    | "{" => (*append nothing but go one depth down*) 
+    if eqb active_token "{" then 
+      (*append nothing but go one depth down*)
       parse_recursive built_tree todo_list' (depth+1)
-
-    | "}" => (*append nothing but go two depths up*) 
+    else if eqb active_token "}" then 
+      (*append nothing but go two depths up*)
       parse_recursive built_tree todo_list' (depth-2)
-
-    | "enum" => (*append active_token and go one depth down*)
+    else if eqb active_token "enum" then 
+      (*append active_token and go one depth down*)
       parse_recursive (append_at_end built_tree depth (list_ascii_of_string active_token)) todo_list' (depth+1)
-    | "message" => (*append active_token and go one depth down*)
+    else if eqb active_token "message" then 
+      (*append active_token and go one depth down*)
       parse_recursive (append_at_end built_tree depth (list_ascii_of_string active_token)) todo_list' (depth+1)
-    | "oneof" => (*append active_token and go one depth down*)
+    else if eqb active_token "oneof" then 
+      (*append active_token and go one depth down*)
       parse_recursive (append_at_end built_tree depth (list_ascii_of_string active_token)) todo_list' (depth+1)
-
-    | _  => (*append active_token and stay in depth*)
+    else 
+      (*append active_token and stay in depth*)
       parse_recursive (append_at_end built_tree depth (list_ascii_of_string active_token)) todo_list' depth
-    end
   end.
 
 (*Parsing function. Takes a list of tokens and return a syntax tree*)

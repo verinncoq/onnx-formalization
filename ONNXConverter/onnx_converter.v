@@ -10,7 +10,7 @@ From ONNXFormalization.External Require Export filter.
 From ONNXFormalization.External Require Export stringifyNNSequential.
 
 From ONNXFormalization.ONNXConverter Require Export bytes_decoder.
-From ONNXFormalization.ONNXConverter Require Export convertion_functions.
+From ONNXFormalization.ONNXConverter Require Export conversion_functions.
 From ONNXFormalization.ONNXConverter Require Export onnx_model_to_premodel.
 
 
