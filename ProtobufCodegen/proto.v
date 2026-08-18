@@ -1,5 +1,5 @@
 (*this file was generated automatically by .\file_import_protobuf.py*)
-From Coq Require Import Strings.String.
+From Stdlib Require Import Strings.String.
 Open Scope string_scope.
 
 (*converted on 2025-04-23 09:50:36 UTC*)

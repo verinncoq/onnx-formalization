@@ -1,15 +1,17 @@
-From Coq Require Import Strings.String.
-From Coq Require Import Strings.Ascii.
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import Bool.
-From Coq Require Import ZArith.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Strings.Ascii.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From Stdlib Require Import Bool.
+From Stdlib Require Import ZArith.
 
-From CoqE2EAI Require Export grab.
-From CoqE2EAI Require Export convert_matrix.
-From CoqE2EAI Require Export bytes_converter.
-From CoqE2EAI Require Export model.
-From CoqE2EAI Require Export convertion_functions.
-From CoqE2EAI Require Export intermediate_representation.
+From ONNXFormalization.External Require Export grab.
+From ONNXFormalization.External Require Export convert_matrix.
+From ONNXFormalization.External Require Export intermediate_representation.
+
+From ONNXFormalization.ONNXConverter Require Export model.
+From ONNXFormalization.ONNXConverter Require Export convertion_functions.
+From ONNXFormalization.ONNXConverter Require Export bytes_converter.
+
 
 (*container type for nodes, tensors, inputs and outputs*)
 Inductive vertex :=
@@ -56,7 +58,7 @@ Definition convert_ValueInfoProto_to_NNPremodel_Output (v: ValueInfoProto) : err
               | Tensor_TypeProto_constructor _ shape_option => match shape_option with
                 | Some shape => match shape with
                   | TensorShapeProto_constructor l =>
-                    let unfiltered_option := list_error_option_to_error_option_list (map Dimension_TensorShapeProto_to_int64 l) [] in
+                    let unfiltered_option := list_error_option_to_error_option_list (map Dimension_TensorShapeProto_to_int64 l) in
                     match unfiltered_option with
                     | Success unfiltered => let filtered := Lists.List.filter not_one unfiltered in
                       match filtered with
@@ -260,7 +262,7 @@ Definition default_zero := (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, By
 (*determines wether an float32 is one*)
 Definition float32_is_one (f: float32) : bool :=
   match Z_of_float32 f with
-  | Some 1 => true
+  | Some 1%Z => true
   | _ => false
   end.
 
@@ -382,4 +384,4 @@ It extracts the list of vertices, sorts out the input vertices and calls convert
 Definition onnx_model_to_premodel_converter (model: ModelProto) : error_option (list NNPremodel) :=
   let vertices := model_proto_to_vertex_list model in
   let vertices_without_inputs := filter is_not_input_vertex vertices in
-  list_error_option_to_error_option_list (map convert_vertex_to_NNPremodel vertices_without_inputs) [].
+  list_error_option_to_error_option_list (map convert_vertex_to_NNPremodel vertices_without_inputs).

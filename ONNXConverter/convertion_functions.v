@@ -1,17 +1,20 @@
 (*this file was generated automatically by ./scripts/redirect_formatter.py on 2025-10-26 10:43:41 UTC*)
 
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List. Import ListNotations.
 
-From Coq Require Import Strings.String.
-From Coq Require Import Lists.List. Import ListNotations.
+From ONNXFormalization.External Require Export grab.
+From ONNXFormalization.External Require Export string_to_number.
 
-From CoqE2EAI Require Export grab.
-From CoqE2EAI Require Export string_to_number.
-From CoqE2EAI Require Export model.
-From CoqE2EAI Require Export float.
-From CoqE2EAI Require Export int.
-From CoqE2EAI Require Export bytes.
-From CoqE2EAI Require Export function_converter.
+From ONNXFormalization.ProtobufDatatypes Require Export float.
+From ONNXFormalization.ProtobufDatatypes Require Export int.
+From ONNXFormalization.ProtobufDatatypes Require Export bytes.
 
+From ONNXFormalization.ProtobufConverter Require Export function_converter.
+
+From ONNXFormalization.ONNXConverter Require Export model.
+
+Open Scope string_scope.
 
 Definition convert_Version (t: tree) : error_option Version :=
 match getFirstChildValue t with

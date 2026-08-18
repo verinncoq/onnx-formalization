@@ -1,11 +1,12 @@
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import Strings.Ascii.
-From Coq Require Import Strings.String.
-From Coq Require Import Init.Nat.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From Stdlib Require Import Strings.Ascii.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Init.Nat.
 Open Scope string_scope.
 
-From CoqE2EAI Require Export escapeSequenceExtractor.
-From CoqE2EAI Require Export bytes.
+From ONNXFormalization.External Require Export escapeSequenceExtractor.
+
+From ONNXFormalization.ProtobufDatatypes Require Export bytes.
 
 (*decodes a bytes string with escape sequences into a string consisting of 0 and 1*)
 Definition decode_bytes (s: string) : error_option string :=

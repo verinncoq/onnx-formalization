@@ -1,0 +1,4 @@
+(rocq.theory
+  (name ONNXFormalization.ProtobufCodegen)
+  (theories Stdlib ONNXFormalization.External ONNXFormalization.ProtobufConverter)
+  (package onnxformalization))

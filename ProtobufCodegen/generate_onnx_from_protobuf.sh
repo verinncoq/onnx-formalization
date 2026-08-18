@@ -1,11 +1,3 @@
-cd ..
-
-echo "Compile proto file..."
-coqc -w none -R ./target CoqE2EAI ./proto.v -o ./target/proto.vo
-
-echo "Compute model..."
-coqc -w none -R ./target CoqE2EAI ./protobuf_converter/protobuf_converter.v -o ./target/protobuf_converter.vo
-
 echo "Convert model to make it executable"
 python ./scripts/redirect_formatter.py /../model.out /../out/model.v
 

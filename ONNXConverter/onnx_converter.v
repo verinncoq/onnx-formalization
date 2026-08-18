@@ -1,17 +1,18 @@
-From Coq Require Import Strings.String.
-From Coq Require Import Strings.Ascii.
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import Bool.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Strings.Ascii.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From Stdlib Require Import Bool.
 Open Scope string_scope.
 
-From CoqE2EAI Require Export bytes_decoder.
-From CoqE2EAI Require Export tokenizer.
-From CoqE2EAI Require Export parser.
-From CoqE2EAI Require Export filter.
-From CoqE2EAI Require Export convertion_functions.
+From ONNXFormalization.External Require Export tokenizer.
+From ONNXFormalization.External Require Export parser.
+From ONNXFormalization.External Require Export filter.
+From ONNXFormalization.External Require Export stringifyNNSequential.
 
-From CoqE2EAI Require Export onnx_model_to_premodel.
-From CoqE2EAI Require Export stringifyNNSequential.
+From ONNXFormalization.ONNXConverter Require Export bytes_decoder.
+From ONNXFormalization.ONNXConverter Require Export convertion_functions.
+From ONNXFormalization.ONNXConverter Require Export onnx_model_to_premodel.
+
 
 Notation "f |> g" := (error_option_compose f g) (at level 85).
 

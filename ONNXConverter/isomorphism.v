@@ -1,8 +1,9 @@
-From Coq Require Import Strings.String.
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import Strings.Byte.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List. 
+Import ListNotations.
+From Stdlib Require Import Strings.Byte.
 
-From CoqE2EAI Require Export onnx_model_to_premodel.
+From ONNXFormalization.ONNXConverter Require Export onnx_model_to_premodel.
 
 (*Functions that help proving*)
 
@@ -250,18 +251,18 @@ Proof. intros. unfold convert_ValueInfoProto_to_NNPremodel_Output in H.
   destruct type. destruct t. destruct o. destruct v.
   destruct o0. destruct t. destruct o. destruct o0. destruct t.
   destruct (list_error_option_to_error_option_list
-        (map Dimension_TensorShapeProto_to_int64 l) []).
+        (map Dimension_TensorShapeProto_to_int64 l)).
   destruct (filter not_one l0).
   all: inversion H.
   all: eauto.
   destruct l1. destruct (Z_of_int64 i0).
   all: inversion H. eauto. destruct o0. destruct t. 
   destruct (list_error_option_to_error_option_list
-         (map Dimension_TensorShapeProto_to_int64 l) []).
+         (map Dimension_TensorShapeProto_to_int64 l)).
   destruct (filter not_one l0). inversion H2. eauto. destruct l1. destruct (Z_of_int64 i).
   all: inversion H. eauto. destruct t. destruct o0. destruct t.
   destruct (list_error_option_to_error_option_list
-         (map Dimension_TensorShapeProto_to_int64 l) []).
+         (map Dimension_TensorShapeProto_to_int64 l)).
   destruct (filter not_one l0). inversion H3. eauto. destruct l1. destruct (Z_of_int64 i).
   all: inversion H. eauto.
   Qed.
@@ -645,13 +646,13 @@ Theorem output_link: forall
 Proof. intros. simpl in H. destruct o6. destruct t. destruct o. destruct v. destruct t.
   destruct o0. destruct o1. destruct t.
   destruct (list_error_option_to_error_option_list
-    (map Dimension_TensorShapeProto_to_int64 l) []).
+    (map Dimension_TensorShapeProto_to_int64 l)).
   destruct (filter not_one l0). all: inversion H.
   - reflexivity.
   - destruct l1. destruct (Z_of_int64 i). all: inversion H. inversion H1. reflexivity.
   - destruct o1. destruct t.
     destruct (list_error_option_to_error_option_list
-         (map Dimension_TensorShapeProto_to_int64 l) []).
+         (map Dimension_TensorShapeProto_to_int64 l)).
     destruct (filter not_one l0). inversion H1. all: try reflexivity.
     destruct l1. destruct (Z_of_int64 i). inversion H1. inversion H1. all: try reflexivity.
     all: inversion H1.

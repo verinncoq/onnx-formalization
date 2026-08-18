@@ -53,8 +53,6 @@ cd scripts
 ./formalize.sh
 cd ..
 
-
-
 echo "Compile ONNX Converter..."
 coqc -w none -R ./target CoqE2EAI ./onnx_converter/bytes_decoder.v -o ./target/bytes_decoder.vo
 coqc -w none -R ./target CoqE2EAI ./onnx_converter/bytes_converter.v -o ./target/bytes_converter.vo

@@ -1,23 +1,25 @@
-From Coq Require Import Bool.Bool.
-From Coq Require Import Strings.String.
-From Coq Require Import Strings.Byte.
-From Coq Require Import Arith.Arith.
-From Coq Require Import Init.Nat.
-From Coq Require Import Arith.EqNat.
-From Coq Require Import Strings.Ascii.
-From Coq Require Import BinNat.
-From Coq Require Import Numbers.NatInt.NZDiv.
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import ZArith.
+From Stdlib Require Import Bool.Bool.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Strings.Byte.
+From Stdlib Require Import Arith.Arith.
+From Stdlib Require Import Init.Nat.
+From Stdlib Require Import Arith.EqNat.
+From Stdlib Require Import Strings.Ascii.
+From Stdlib Require Import BinNat.
+From Stdlib Require Import Numbers.NatInt.NZDiv.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From Stdlib Require Import ZArith.
 
 From Flocq Require Import Bits BinarySingleNaN.
 
-From CoqE2EAI Require Export bitstrings.
-From CoqE2EAI Require Export error_option.
-From CoqE2EAI Require Export unpack.
-From CoqE2EAI Require Export float.
-From CoqE2EAI Require Export int.
-From CoqE2EAI Require Export bytes_decoder.
+From ONNXFormalization.External Require Export bitstrings.
+From ONNXFormalization.External Require Export error_option.
+From ONNXFormalization.External Require Export unpack.
+
+From ONNXFormalization.ProtobufDatatypes Require Export float.
+From ONNXFormalization.ProtobufDatatypes Require Export int.
+
+From ONNXFormalization.ONNXConverter Require Export bytes_decoder.
 
 
 (*little helpers*)

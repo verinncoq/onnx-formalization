@@ -1,0 +1,4 @@
+(rocq.theory
+  (name ONNXFormalization.ONNXEvaluator)
+  (theories Stdlib ONNXFormalization.External)
+  (package onnxformalization))

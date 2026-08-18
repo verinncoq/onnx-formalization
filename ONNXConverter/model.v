@@ -2,11 +2,11 @@
 
 (*This file was generated automatically*)
 
-From Coq Require Import Strings.String.
-From Coq Require Import Lists.List. Import ListNotations.
-From CoqE2EAI Require Export float.
-From CoqE2EAI Require Export int.
-From CoqE2EAI Require Export bytes.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From ONNXFormalization.ProtobufDatatypes Require Export float.
+From ONNXFormalization.ProtobufDatatypes Require Export int.
+From ONNXFormalization.ProtobufDatatypes Require Export bytes.
 
 
 Inductive Version :=

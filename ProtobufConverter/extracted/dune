@@ -1,3 +1,0 @@
-(library
-  (name protobuf_converter_extracted)
-  (modules Ascii BinNat BinNums BinPos Bool Datatypes List ListDef Nat PeanoNat PosDef String error_option Model_converter Preprocessor Parser_protobuf Tokenizer_protobuf String_tree Type_converter Function_converter Sorter IR_converter_protobuf Protobuf_converter))
