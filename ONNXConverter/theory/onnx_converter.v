@@ -45,5 +45,3 @@ Definition onnx_tree_converter (s: string) : error_option tree :=
     (fun onnx => Success (parser.parse (tokenizer.tokenize onnx)))) in
   conversion s.
 
-(*Compute onnx_converter_to_onnx_model cartpole.*)
-

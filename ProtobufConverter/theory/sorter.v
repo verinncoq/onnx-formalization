@@ -2,6 +2,7 @@ From Stdlib Require Import String.
 From Stdlib Require Import Lists.List. Import ListNotations.
 From Stdlib Require Import NArith.BinNat.
 
+From ONNXFormalization.External Require Import add_linefeed.
 From ONNXFormalization.ProtobufConverter Require Export IR_converter_protobuf.
 From ONNXFormalization.ProtobufConverter Require Export type_converter.
 From ONNXFormalization.ProtobufConverter Require Export model_converter.

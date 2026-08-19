@@ -2,6 +2,7 @@ From Coq Require Import Strings.String.
 From Coq Require Import Lists.List. Import ListNotations.
 From Coq Require Import ZArith.
 
+From ONNXFormalization.External Require Import add_linefeed.
 From CoqE2EAI Require Export onnx_converter.
 From CoqE2EAI Require Export onnx_evaluator.
 

@@ -1,17 +1,16 @@
-(*this file was generated automatically by ./scripts/redirect_formatter.py on 2025-10-26 11:05:00 UTC*)
+(* this file was generated automatically by the ONNX converter *)
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Strings.Ascii.
+From Stdlib Require Import Reals.
 
-(*this file was generated automatically*)
-    From Coq Require Import Strings.String.
-    From Coq Require Import Strings.Ascii.
+From Coquelicot Require Import Coquelicot.
 
-    From Coq Require Import Reals.
-    From Coquelicot Require Import Coquelicot.
-    From CoqE2EAI Require Import matrix_extensions piecewise_affine neuron_functions.
-    From CoqE2EAI Require Import neural_networks.
-    From CoqE2EAI Require Import string_to_number.
-    From CoqE2EAI Require Import transpose_mult_matrix.
-  
-  Open Scope nat_scope.
+From ONNXFormalization.External Require Import matrix_extensions piecewise_affine neuron_functions.
+From ONNXFormalization.External Require Import neural_networks.
+From ONNXFormalization.External Require Import string_to_number.
+From ONNXFormalization.External Require Import transpose_mult_matrix.
+
+Open Scope nat_scope.
 
 
 

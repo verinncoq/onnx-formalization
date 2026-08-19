@@ -3,12 +3,11 @@ From Stdlib Require Import Strings.String.
 Open Scope string_scope.
 From Stdlib Require Import Lists.List. Import ListNotations.
 
+From ONNXFormalization.External Require Export add_linefeed.
 From ONNXFormalization.External Require Export string_tree.
 From ONNXFormalization.External Require Export error_option.
-From ONNXFormalization.ProtobufConverter Require Export IR_converter_protobuf.
 
-(*Adds a linefeed at the end of the string*)
-Definition add_linefeed (s: string) : string := s ++ String (ascii_of_nat 10) EmptyString.
+From ONNXFormalization.ProtobufConverter Require Export IR_converter_protobuf.
 
 (*Converts the label of an enum-Structure, having the type as a constructor's name*)
 Definition convert_enum_label (label: TypeLabelPair) : string := 
