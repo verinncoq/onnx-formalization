@@ -8,29 +8,22 @@ The formalization comes in two parts: The formalization of the ONNX-syntax and t
 
 ## Build
 
-### Using Nix (Recommended)
+### Prerequisites: Rocq Platform and Python
 
-This project provides configuration for setting up a development environment with [Nix](https://nixos.org/). You can prepare and enter development shell with all base tools (Rocq, OCaml, Dune, opam, Python):
-```bash
-nix-shell
-```
-Otherwise, please enter the shell each time you want to work on the project!
+Install [Rocq Platform 2026.07.0](https://github.com/rocq-prover/platform/releases/tag/2026.07.0) which provides basic required dependencies (Rocq, OCaml, Dune, opam). You also need [Python](https://www.python.org/) and [onnxruntime](https://onnxruntime.ai/) (tested with Python 3.14.4 and onnxruntime 1.23).
 
 ### Initial dependencies setup (one-time)
-Inside the Nix shell:
 ```bash
 opam install . --deps-only
-pip install -r requirements.txt
 ```
 ### Compilation and recompilation
-Within the Nix shell:
 ```bash
 dune build
 ```
 
 ## Usage
 
-After compiling the project with `dune build`, you can run the following tools from the project root:
+After compiling the project with `dune build`, you can run the following tools from the project root.
 
 ### Protobuf Converter
 Converts Protocol Buffers definitions to an intermediate representation.
