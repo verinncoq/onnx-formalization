@@ -32,9 +32,6 @@ let decode_binary_to_text_proto (protobuf_schema : string) (input_file : string)
    Each input: name|value1,value2,...|dim1,dim2,...
    Inputs in one evaluation are separated by ';;'
    Example: input1|0.1,0.2,0.3|1,28,28;;input2|0.4,0.5|1,10
-   
-   Note: The extracted evaluate function expects ((string * string list) * string list) list
-   which is ((name, values), dims). Coq's right-associative A*B*C becomes OCaml's left-associative (A*B)*C.
  *)
 let parse_inputs_from_stdin () : ((string * string list) * string list) list list =
   let lines = ref [] in
@@ -71,6 +68,129 @@ let format_error_option = function
   | Rocq_onnx_evaluator.Success result -> format_output_list result
   | Rocq_onnx_evaluator.Error msg -> Printf.sprintf "\"Error: %s\"" msg
 
+(* OCaml implementations to avoid Rocq string handling stack overflows *)
+
+(* Convert int32 to Rocq positive *)
+let int32_to_positive (bits: int32) : Rocq_onnx_evaluator.positive =
+  let open Rocq_onnx_evaluator in
+  let rec loop bits =
+    if bits = 0l then XH
+    else if bits = 1l then XH
+    else if Int32.logand bits 1l = 0l then 
+      XO (loop (Int32.shift_right_logical bits 1))
+    else 
+      XI (loop (Int32.shift_right_logical bits 1))
+  in
+  if bits = 0l then XH
+  else loop bits
+
+(* OCaml implementation of float32_of_string *)
+let ocaml_float32_of_string (s: string) : Rocq_onnx_evaluator.float32 option = 
+  try
+    let f = float_of_string s in
+    let bits_int32 = Int32.bits_of_float f in
+    (* Convert to unsigned 32-bit representation *)
+    let bits_uint32 = 
+      if bits_int32 < 0l then 
+        Int32.add bits_int32 (Int32.shift_left 1l 31)
+      else 
+        bits_int32
+    in
+    let pos = int32_to_positive bits_uint32 in
+    Some (Rocq_onnx_evaluator.b32_of_bits (Rocq_onnx_evaluator.Zpos pos))
+  with _ -> None
+
+(* OCaml implementation of int64_of_string *)
+let ocaml_int64_of_string (s: string) : Rocq_onnx_evaluator.int64 option = 
+  try
+    let i = Int64.of_string s in
+    (* Convert to Rocq int64 (nested tuple of 8 bytes, big-endian) *)
+    let get_byte shift = 
+      let shifted = Int64.shift_right_logical i shift in
+      let masked = Int64.logand shifted 0xFFL in
+      Char.chr (Int64.to_int masked)
+    in
+    let b0 = get_byte 56 in  (* MSB *)
+    let b1 = get_byte 48 in
+    let b2 = get_byte 40 in
+    let b3 = get_byte 32 in
+    let b4 = get_byte 24 in
+    let b5 = get_byte 16 in
+    let b6 = get_byte 8 in
+    let b7 = get_byte 0 in   (* LSB *)
+    Some (((((((b0, b1), b2), b3), b4), b5), b6), b7)
+  with _ -> None
+
+(* Convert string inputs to TensorProto using OCaml implementations *)
+let convert_string_inputs_to_tensors (inputs: ((string * string list) * string list) list) : 
+    Rocq_onnx_evaluator.tensorProto list =
+  List.map (fun ((name, value_strs), dim_strs) ->
+    (* Convert string values to float32 using OCaml implementation *)
+    let floats = 
+      List.map (fun s -> 
+        match ocaml_float32_of_string s with
+        | Some f -> f
+        | None -> failwith (Printf.sprintf "Cannot convert '%s' to float32" s)
+      ) value_strs
+    in
+    (* Convert string dims to int64 using OCaml implementation *)
+    let dims = 
+      List.map (fun s -> 
+        match ocaml_int64_of_string s with
+        | Some i -> i
+        | None -> failwith (Printf.sprintf "Cannot convert '%s' to int64" s)
+      ) dim_strs
+    in
+    (* Create tensor using Rocq's float_tensor *)
+    Rocq_onnx_evaluator.float_tensor ("\"" ^ name ^ "\"") floats dims
+  ) inputs
+
+(* Convert nat to string *)
+let nat_to_string (n: Rocq_onnx_evaluator.nat) : string =
+  let rec nat_to_int = function
+    | Rocq_onnx_evaluator.O -> 0
+    | Rocq_onnx_evaluator.S n' -> 1 + nat_to_int n'
+  in
+  string_of_int (nat_to_int n)
+
+(* Convert output tensors to string format *)
+let convert_output_tensors (tensors: Rocq_onnx_evaluator.tensorProto list) : 
+    ((string list * string list) list) Rocq_onnx_evaluator.error_option =
+  let rec list_error_option_to_error_option_list = function
+    | [] -> Rocq_onnx_evaluator.Success []
+    | h :: t ->
+        match h, list_error_option_to_error_option_list t with
+        | Rocq_onnx_evaluator.Success h', Rocq_onnx_evaluator.Success t' ->
+            Rocq_onnx_evaluator.Success (h' :: t')
+        | Rocq_onnx_evaluator.Error e, _ -> Rocq_onnx_evaluator.Error e
+        | _, Rocq_onnx_evaluator.Error e -> Rocq_onnx_evaluator.Error e
+  in
+  
+  let convert_tensor tensor : (string list * string list) Rocq_onnx_evaluator.error_option =
+    match Rocq_onnx_evaluator.matrix_float32_of_tensor tensor with
+    | Rocq_onnx_evaluator.Success matrix ->
+        let string_matrix = Rocq_onnx_evaluator.string_matrix_of_matrix_float32 matrix in
+        let values = Rocq_onnx_evaluator.convert_to_row_major string_matrix in
+        let (height, width) = Rocq_onnx_evaluator.shape matrix in
+        let dims = [nat_to_string height; nat_to_string width] in
+        Rocq_onnx_evaluator.Success (values, dims)
+    | Rocq_onnx_evaluator.Error e -> Rocq_onnx_evaluator.Error e
+  in
+  list_error_option_to_error_option_list (List.map convert_tensor tensors)
+
+(* Direct evaluation using onnx_evaluator *)
+let evaluate_direct (text_proto: string) (inputs: ((string * string list) * string list) list) : 
+    ((string list * string list) list) Rocq_onnx_evaluator.error_option =
+  match Rocq_onnx_evaluator.onnx_converter_to_onnx_model text_proto with
+  | Rocq_onnx_evaluator.Success model ->
+      let input_tensors = convert_string_inputs_to_tensors inputs in
+      begin
+        match Rocq_onnx_evaluator.onnx_evaluator model input_tensors with
+        | Rocq_onnx_evaluator.Success output_tensors -> convert_output_tensors output_tensors
+        | Rocq_onnx_evaluator.Error e -> Rocq_onnx_evaluator.Error e
+      end
+  | Rocq_onnx_evaluator.Error e -> Rocq_onnx_evaluator.Error e
+
 let () =
 
   if Array.length Sys.argv < 3 then begin
@@ -91,10 +211,10 @@ let () =
   (* Read and parse inputs from stdin *)
   let all_inputs = parse_inputs_from_stdin () in
   
-  (* Call evaluate for each input set *)
+  (* Call evaluate_direct for each input set *)
   let results =
     List.map (fun inputs ->
-      Rocq_onnx_evaluator.evaluate text_proto inputs
+      evaluate_direct text_proto inputs
     ) all_inputs
   in
 

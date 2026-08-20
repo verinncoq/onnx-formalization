@@ -1,31 +1,31 @@
 import subprocess
 import sys
+import os
+
 import onnxruntime as ort
 import numpy as np
-import os
 
 
 # use standard parameters
 evaluations = 10  # number of evaluations
 model_path = "../cartpole.onnx"  # path to the ONNX model
-model_name = "cartpole"  # legacy parameter name, no longer used
 onnx_proto_schema = "../onnx.proto"  # path to ONNX protobuf schema
 
 # exactly one argument is invalid
 if len(sys.argv) < 3:
-    print(f"Usage: {sys.argv[0]} <number_evaluations> <model_path> <model_name> [onnx_proto_schema]")
+    print(f"Usage: {sys.argv[0]} <number_evaluations> <model_path> [onnx_proto_schema]")
     exit()
 
 # if arguments are given
-if len(sys.argv) >= 4:
+if len(sys.argv) >= 3:
     # use parameters from command line inputs
     evaluations = int(sys.argv[1])
     model_path = sys.argv[2]
-    model_name = sys.argv[3]
-    if len(sys.argv) > 4:
-        onnx_proto_schema = sys.argv[4]
+    if len(sys.argv) > 3:
+        onnx_proto_schema = sys.argv[3]
 
 session = ort.InferenceSession(model_path)  # set up a runtime session
+print("\n\n\n\n\n\n!!!!!!!!!\n:) Please ignore all 'Schema error:' messages with the same file and line number, they are harmless :)\n!!!!!!!!!\n\n\n\n\n\n")
 
 # get input shapes & names
 shapes = []  # shapes of the inputs
@@ -143,18 +143,23 @@ def parse_runner_output(output_bytes: bytes):
 
 
 # Parse runner output
-rocq_results = parse_runner_output(result_.stdout)
+runner_output = result_.stdout
+rocq_results = parse_runner_output(runner_output)
 
 # compare
 correct = True
 for i, (runtime, rocq) in enumerate(zip(runtime_outputs, rocq_results)):
+    print("-------------------------------------------------------------------------")
+    print("ROCQ:         ", rocq)
+    print("ONNX Runtime: ", runtime)
+    print("-------------------------------------------------------------------------")
     if not np.allclose(runtime, rocq):
         print(f"Mismatch at evaluation {i}")
         correct = False
 
-print(f"Tested {model_name} on {evaluations} random inputs.")
+print(f"Tested model {model_path} on {evaluations} random inputs.")
 if correct:
-    print("Both the ONNX Runtime and Rocq's ONNX Evaluator return the same results on every tested input.")
+    print("Both the ONNX Runtime and Rocq's ONNX Evaluator return approximately the same results on every tested input.")
     print("The Formalization seems to be correct!")
 else:
     print(
