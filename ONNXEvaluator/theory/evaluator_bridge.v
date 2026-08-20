@@ -89,9 +89,9 @@ Definition onnx_evaluator_wrapper (model: ModelProto) (input: list (string * lis
   | Error e => Error e
   end.
 
-(*Converts the model found at model_name to Rocq and Evaluates the model on the input.*)
-Definition evaluate (model_name: string) (input: list (string * (list string) * (list string))) : error_option (list (list string * list string)) :=
-  match onnx_converter_to_onnx_model model_name with
+(*Converts the ONNX model (as text proto string) to Rocq and evaluates it on the input.*)
+Definition evaluate (onnx_model_text_proto: string) (input: list (string * (list string) * (list string))) : error_option (list (list string * list string)) :=
+  match onnx_converter_to_onnx_model onnx_model_text_proto with
   | Success model => onnx_evaluator_wrapper model input
   | Error e => Error e
   end.

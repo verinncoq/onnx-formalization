@@ -3,26 +3,27 @@ import sys
 import onnxruntime as ort
 import numpy as np
 import os
-    
+
 
 # use standard parameters
 evaluations = 10  # number of evaluations
 model_path = "../cartpole.onnx"  # path to the ONNX model
-model_name = "cartpole"  # name of the model, which must be defined as a string in Rocq
-
+model_name = "cartpole"  # legacy parameter name, no longer used
+onnx_proto_schema = "../onnx.proto"  # path to ONNX protobuf schema
 
 # exactly one argument is invalid
-if len(sys.argv) <= 3:
-    print(f"Please give either zero parameters or more than one (sys.argv[0] <number_evaluations> <model_path> <neural_network_name>).")
+if len(sys.argv) < 3:
+    print(f"Usage: {sys.argv[0]} <number_evaluations> <model_path> <model_name> [onnx_proto_schema]")
     exit()
 
-# if more than one argument is given
-if len(sys.argv) > 3:
+# if arguments are given
+if len(sys.argv) >= 4:
     # use parameters from command line inputs
     evaluations = int(sys.argv[1])
     model_path = sys.argv[2]
     model_name = sys.argv[3]
-
+    if len(sys.argv) > 4:
+        onnx_proto_schema = sys.argv[4]
 
 session = ort.InferenceSession(model_path)  # set up a runtime session
 
@@ -49,98 +50,106 @@ for i in range(evaluations):
     runtime_outputs_per_evaluation = session.run(None, d)
     runtime_outputs.append(runtime_outputs_per_evaluation)
 
-# create rocq file
 
-roqc_file = """
-From Coq Require Import Strings.String.
-From Coq Require Import Lists.List. Import ListNotations.
-
-From CoqE2EAI Require Export test_enviroment_helper.
-From CoqE2EAI Require Export net.
-
-"""
+def array_to_string_list(a: np.ndarray):
+    """Convert numpy array to list of string values and list of string dimensions."""
+    values = list(a.flatten())
+    dims = list(a.shape)
+    return values, dims
 
 
-def array_to_rocq_list(a: np.ndarray):
-    value_list = "["
-    l = list(a.flatten())
-    for value in l:
-        value_list += f'"{value:.6f}";'
-    value_list = value_list[:-1]
-    value_list += "]"
-    dim_list = "["
-    for dim in list(a.shape):
-        dim_list += f'"{dim}";'
-    dim_list = dim_list[:-1]
-    dim_list += "]"
-    return value_list, dim_list
+def format_input_for_runner(input_name: str, values: list, dims: list) -> str:
+    """Format a single input as name|value1,value2,...|dim1,dim2,..."""
+    values_str = ",".join([f"{v:.6f}" for v in values])
+    dims_str = ",".join([str(d) for d in dims])
+    return f"{input_name}|{values_str}|{dims_str}"
 
 
-for evaluation, inputs_per_evaluation in enumerate(inputs):
-    roqc_file += f"(*evaluation {evaluation}*)\n"
-    roqc_file += f"Definition inputs_{evaluation} := ["
-    for input_nr, input_ in enumerate(inputs_per_evaluation):
-        roqc_file += "("
-        roqc_file += f'"""{input_names[input_nr]}""", '
-        value_list, dim_list = array_to_rocq_list(input_)
-        roqc_file += f"{value_list}, {dim_list}"
-        roqc_file += ")"
-    roqc_file += f"].\n"
-    roqc_file += f"Compute onnx_evaluator_wrapper_reformatter (evaluate {model_name} inputs_{evaluation}).\n\n"
+# Serialize all inputs for the runner
+# Format: One line per evaluation, inputs separated by ';;'
+# Each input: name|value1,value2,...|dim1,dim2,...
+runner_input_lines = []
+for inputs_per_evaluation in inputs:
+    input_strs = []
+    for input_nr, input_array in enumerate(inputs_per_evaluation):
+        values, dims = array_to_string_list(input_array)
+        input_strs.append(format_input_for_runner(input_names[input_nr], values, dims))
+    runner_input_lines.append(";;".join(input_strs))
 
-# write file
-with open("evaluations.v", "w") as f:
-    f.write(roqc_file)
+runner_input = "\n".join(runner_input_lines)
 
-# compile file
-result_ = subprocess.run(['coqc', '-w', 'none', '-R', './../target', 'CoqE2EAI', './evaluations.v'],
-                         stdout=subprocess.PIPE)
+# Path to the runner executable
+runner_exe = os.path.join("_build", "default", "ONNXEvaluator", "runner", "onnx_evaluator_runner.exe")
 
-# remove files
-os.remove(".evaluations.aux")
-os.remove("evaluations.glob")
-os.remove("evaluations.v")
-os.remove("evaluations.vo")
-os.remove("evaluations.vok")
-os.remove("evaluations.vos")
+# Set LD_LIBRARY_PATH to avoid GLIBCXX issues with protoc
+os.environ["LD_LIBRARY_PATH"] = "/usr/lib/x86_64-linux-gnu:/usr/local/lib"
 
+# Call the runner
+print(f"Calling runner: {runner_exe}")
+print(f"Model path: {model_path}")
+print(f"Proto schema: {onnx_proto_schema}")
 
-def reformat_coqc_out(b: bytes):
-    results = str(b).split("= Success")
-    results.pop(0)
-    out = []
-    for result in results:
-        result = result.replace("\\r\\n", "")
-        result = result.replace(": error_option string", "")
-        result = result.replace('"', "")
-        result = result.replace("'", "")
-        result = result.replace("\\n", "")
-        result = result.strip()
-        t = eval(result)
-        out.append(t)
-    return out
+result_ = subprocess.run(
+    [runner_exe, model_path, onnx_proto_schema],
+    input=runner_input.encode(),
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=False
+)
+
+# Check for errors
+if result_.returncode != 0:
+    print(f"Error running ONNX evaluator runner (exit code {result_.returncode}):")
+    print("OCaml runner STDOUT:")
+    print(result_.stdout.decode())
+    print("OCaml runner STDERR:")
+    print(result_.stderr.decode())
+    exit(1)
 
 
-def rocq_to_numpy_arrays(b: bytes):
-    reformatted = reformat_coqc_out(b)
-    out = []
-    for evaluation in reformatted:
+def parse_runner_output(output_bytes: bytes):
+    """Parse the runner output into numpy arrays.
+    
+    The runner outputs: [[(vals, dims), ...], [(vals, dims), ...], ...]
+    Each evaluation output is a list of (values_list, dims_list) tuples.
+    """
+    import ast
+    
+    output_str = output_bytes.decode().strip()
+    # The output is a Python list of lists of tuples
+    try:
+        parsed = ast.literal_eval(output_str)
+    except Exception as e:
+        print(f"Failed to parse runner output: {e}")
+        print(f"Output was: {output_str}")
+        return []
+    
+    results = []
+    for evaluation in parsed:
+        if evaluation == "":
+            continue
         out_inner = []
+        # evaluation is a list of (values_list, dims_list) tuples
         for output in evaluation:
-            a = np.array(output[0])
-            a.reshape(output[1])
-            out_inner.append(a)
-        out.append(out_inner)
-    return out
+            if isinstance(output, tuple) and len(output) == 2:
+                values, dims = output
+                a = np.array([float(v) for v in values])
+                # Reshape using dims
+                if dims:
+                    a = a.reshape([int(d) for d in dims])
+                out_inner.append(a)
+        results.append(out_inner)
+    return results
 
 
-# get rocq results
-rocq_results = rocq_to_numpy_arrays(result_.stdout)
+# Parse runner output
+rocq_results = parse_runner_output(result_.stdout)
 
 # compare
 correct = True
-for runtime, rocq in zip(runtime_outputs, rocq_results):
+for i, (runtime, rocq) in enumerate(zip(runtime_outputs, rocq_results)):
     if not np.allclose(runtime, rocq):
+        print(f"Mismatch at evaluation {i}")
         correct = False
 
 print(f"Tested {model_name} on {evaluations} random inputs.")
@@ -151,4 +160,3 @@ else:
     print(
         "Unfortunately, the ONNX Runtime and Rocq's ONNX Evaluator do not return the same results on every tested input.")
     print(f"The Formalization is not said the be correct! You should debug this file ({sys.argv[0]}), especially the parameters defined at the beginning.")
-

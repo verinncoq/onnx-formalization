@@ -73,58 +73,59 @@ Fixpoint onnx_evaluator_recursive (depth: nat) (user_inputs: list TensorProto) (
     match evaluate with
     (*Node: check op_type and compute it if possible*)
     | node (NodeProto_constructor node_inputs node_outputs _ op_type _ _ attributes _ _ _) => match op_type with
-
-      | Some """Gemm""" => match node_inputs with (*check input amount*)
-        | [node_input_A; node_input_B; node_input_C] => (*three inputs*)
-          (*search for vertices with specified names and check if there are given and unique*)
-          match find_vertex vertices node_input_A, find_vertex vertices node_input_B, find_vertex vertices node_input_C with
-          | [vertex_A], [vertex_B], [vertex_C] => (*evaluate each vertex and compute gemm*)
-            match
-            onnx_evaluator_recursive n user_inputs vertices vertex_A,
-            onnx_evaluator_recursive n user_inputs vertices vertex_B,
-            onnx_evaluator_recursive n user_inputs vertices vertex_C
-            with
-            | Success A, Success B, Success C => gemm A B C attributes
-            | Error e, _, _ => Error e
-            | _, Error e, _ => Error e
-            | _, _, Error e => Error e
+      | Some s => 
+        if eqb s """Gemm""" then 
+          match node_inputs with (*check input amount*)
+          | [node_input_A; node_input_B; node_input_C] => (*three inputs*)
+            (*search for vertices with specified names and check if there are given and unique*)
+            match find_vertex vertices node_input_A, find_vertex vertices node_input_B, find_vertex vertices node_input_C with
+            | [vertex_A], [vertex_B], [vertex_C] => (*evaluate each vertex and compute gemm*)
+              match
+              onnx_evaluator_recursive n user_inputs vertices vertex_A,
+              onnx_evaluator_recursive n user_inputs vertices vertex_B,
+              onnx_evaluator_recursive n user_inputs vertices vertex_C
+              with
+              | Success A, Success B, Success C => gemm A B C attributes
+              | Error e, _, _ => Error e
+              | _, Error e, _ => Error e
+              | _, _, Error e => Error e
+              end
+            | _, _, _ => Error ("ONNX Evaluator: found not exactly one vertex with name " ++
+                        node_input_A ++ " or " ++ node_input_B ++ " or " ++ node_input_C)
             end
-          | _, _, _ => Error ("ONNX Evaluator: found not exactly one vertex with name " ++
-                       node_input_A ++ " or " ++ node_input_B ++ " or " ++ node_input_C)
-          end
-        | [node_input_A; node_input_B] => (*two inputs*)
-          (*search for vertices with specified names and check if there are given and unique*)
-          match find_vertex vertices node_input_A, find_vertex vertices node_input_B with
-          | [vertex_A], [vertex_B] => (*evaluate each vertex and compute gemm*)
-            match
-            onnx_evaluator_recursive n user_inputs vertices vertex_A,
-            onnx_evaluator_recursive n user_inputs vertices vertex_B
-            with
-            | Success A, Success B => gemm_two_inputs A B attributes
-            | Error e, _ => Error e
-            | _, Error e => Error e
+          | [node_input_A; node_input_B] => (*two inputs*)
+            (*search for vertices with specified names and check if there are given and unique*)
+            match find_vertex vertices node_input_A, find_vertex vertices node_input_B with
+            | [vertex_A], [vertex_B] => (*evaluate each vertex and compute gemm*)
+              match
+              onnx_evaluator_recursive n user_inputs vertices vertex_A,
+              onnx_evaluator_recursive n user_inputs vertices vertex_B
+              with
+              | Success A, Success B => gemm_two_inputs A B attributes
+              | Error e, _ => Error e
+              | _, Error e => Error e
+              end
+            | _, _ => Error ("ONNX Evaluator: found not exactly one vertex with name " ++
+                        node_input_A ++ " or " ++ node_input_B)
             end
-          | _, _ => Error ("ONNX Evaluator: found not exactly one vertex with name " ++
-                       node_input_A ++ " or " ++ node_input_B)
+          | _ => Error "Gemm must have 2-3 inputs"
           end
-        | _ => Error "Gemm must have 2-3 inputs"
-        end
-
-      | Some """Relu""" => match node_inputs with (*check input amount*)
-        | [node_input_name] =>
-          (*search for vertex with specified name and check if it is given and unique*)
-          match find_vertex vertices node_input_name with
-          | [vertex] => (*evaluate each vertex and compute gemm*)
-            match onnx_evaluator_recursive n user_inputs vertices vertex with
-            | Success rec => op_relu.relu rec
-            | Error e => Error e
+        else
+        if eqb s """Relu""" then 
+          match node_inputs with (*check input amount*)
+          | [node_input_name] =>
+            (*search for vertex with specified name and check if it is given and unique*)
+            match find_vertex vertices node_input_name with
+            | [vertex] => (*evaluate each vertex and compute gemm*)
+              match onnx_evaluator_recursive n user_inputs vertices vertex with
+              | Success rec => op_relu.relu rec
+              | Error e => Error e
+              end
+            | _ => Error ("ONNX Evaluator: found not exactly one vertex with name " ++ node_input_name)
             end
-          | _ => Error ("ONNX Evaluator: found not exactly one vertex with name " ++ node_input_name)
+          | _ => Error "Relu must have exactly one input"
           end
-        | _ => Error "Relu must have exactly one input"
-        end
-
-      | Some type => Error ("ONNX Evaluator: op_type of NodeProto must be a valid, implemented operation, not " ++ type)
+        else Error ("ONNX Evaluator: op_type of NodeProto must be a valid, implemented operation, not " ++ s)
       | None => Error ("ONNX Evaluator: op_type of NodeProto must be non-empty")
       end
 
