@@ -1,10 +1,10 @@
-From Coq Require Import Strings.String.
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import ZArith.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From Stdlib Require Import ZArith.
 
-From CoqE2EAI Require Export error_option.
-From CoqE2EAI Require Export model.
-From CoqE2EAI Require Export matrices.
+From ONNXFormalization.External Require Export error_option.
+From ONNXFormalization.ONNXConverter Require Export model.
+From ONNXFormalization.ONNXEvaluator Require Export matrices.
 
 
 (*gemm for various datatypes*)
@@ -95,7 +95,7 @@ Definition gemm_int64 (A B C: matrix int64) (alpha beta: int64) (transA transB: 
 
 (*tensor-to-matrix*)
 
-From CoqE2EAI Require Export bytes_converter.
+From ONNXFormalization.ONNXConverter Require Export bytes_converter.
 
 (*Convert a list of int64 dims to a pair of nat. Works only for scalars, vectors and matrices. If not a matrix, dimensions get set to zero.*)
 Definition convert_dims (dims: list int64) : error_option (nat * nat) :=
@@ -241,8 +241,8 @@ Definition tensor_of_matrix_int64 (m: matrix int64) : error_option TensorProto :
 
 (*GEMM*)
 
+From ONNXFormalization.ONNXConverter Require Export onnx_model_to_premodel.
 Open Scope Z_scope.
-From CoqE2EAI Require Export onnx_model_to_premodel.
 
 (*Extracts the Attributes necessary for the gemm operation. If not found, it's replaces by a default*)
 Definition get_gemm_attributes (a: list AttributeProto) : (float32 * float32 * int64 * int64) :=

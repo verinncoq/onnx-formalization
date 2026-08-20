@@ -1,10 +1,10 @@
-From Coq Require Import Strings.String.
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import ZArith.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From Stdlib Require Import ZArith.
 From Flocq Require Import Bits BinarySingleNaN.
 
-From CoqE2EAI Require Export error_option.
-From CoqE2EAI Require Export model.
+From ONNXFormalization.External Require Export error_option.
+From ONNXFormalization.ONNXConverter Require Export model.
 
 (*relu for various datatypes*)
 
@@ -35,7 +35,7 @@ Definition relu_int64 (i: int64) : int64 :=
   end.
 
 Open Scope Z_scope.
-From CoqE2EAI Require Export bytes_converter.
+From ONNXFormalization.ONNXConverter Require Export bytes_converter.
 
 (*Computes ReLU, as definied by ONNX*)
 Definition relu (X: TensorProto) : error_option TensorProto :=

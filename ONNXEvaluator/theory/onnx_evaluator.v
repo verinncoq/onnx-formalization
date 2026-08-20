@@ -1,12 +1,12 @@
-From Coq Require Import Strings.String.
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import ZArith.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From Stdlib Require Import ZArith.
 
-From CoqE2EAI Require Export error_option.
-From CoqE2EAI Require Export model.
-From CoqE2EAI Require Export matrices.
-From CoqE2EAI Require Export relu.
-From CoqE2EAI Require Export gemm.
+From ONNXFormalization.External Require Export error_option.
+From ONNXFormalization.ONNXConverter Require Export model.
+From ONNXFormalization.ONNXEvaluator Require Export matrices.
+From ONNXFormalization.ONNXEvaluator Require Export op_relu.
+From ONNXFormalization.ONNXEvaluator Require Export op_gemm.
 
 (*computes wether a string occures in a given list*)
 Fixpoint Inb (s: string) (l: list string) : bool :=
@@ -116,7 +116,7 @@ Fixpoint onnx_evaluator_recursive (depth: nat) (user_inputs: list TensorProto) (
           match find_vertex vertices node_input_name with
           | [vertex] => (*evaluate each vertex and compute gemm*)
             match onnx_evaluator_recursive n user_inputs vertices vertex with
-            | Success rec => relu.relu rec
+            | Success rec => op_relu.relu rec
             | Error e => Error e
             end
           | _ => Error ("ONNX Evaluator: found not exactly one vertex with name " ++ node_input_name)
@@ -164,7 +164,7 @@ Definition onnx_evaluator (model: ModelProto) (user_inputs: list TensorProto) : 
         let vertices := (map (fun x => node x) (rev nodes)) ++ (map (fun x => input x) inputs) ++ (map (fun x => tensor x) initializers) in
         let evaluate := onnx_evaluator_recursive (length vertices) user_inputs vertices in
         let output_vertices := map (fun x => output x) outputs in
-        list_error_option_to_error_option_list (map evaluate output_vertices) []
+        list_error_option_to_error_option_list (map evaluate output_vertices)
       end
     | None => Error "ONNX Evaluator: Model must define a graph"
     end

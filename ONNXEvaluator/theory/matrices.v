@@ -1,11 +1,11 @@
-From Coq Require Import Strings.String.
-From Coq Require Import Lists.List. Import ListNotations.
-From Coq Require Import ZArith.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List. Import ListNotations.
+From Stdlib Require Import ZArith.
 
 From Flocq Require Import Bits BinarySingleNaN.
 
-From CoqE2EAI Require Export error_option.
-From CoqE2EAI Require Export convertion_functions.
+From ONNXFormalization.External Require Export error_option.
+From ONNXFormalization.ONNXConverter Require Export conversion_functions.
 
 
 (*general definitions*)

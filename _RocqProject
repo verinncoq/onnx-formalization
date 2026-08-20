@@ -2,3 +2,4 @@
 -R ./_build/default/ProtobufConverter/theory/ ONNXFormalization.ProtobufConverter
 -R ./_build/default/ProtobufDatatypes/ ONNXFormalization.ProtobufDatatypes
 -R ./_build/default/ONNXConverter/theory/ ONNXFormalization.ONNXConverter
+-R ./_build/default/ONNXEvaluator/theory/ ONNXFormalization.ONNXEvaluator
