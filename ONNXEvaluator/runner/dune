@@ -1,0 +1,13 @@
+(rocq.extraction
+ (prelude onnx_evaluator_extraction)
+ (extracted_modules rocq_onnx_evaluator)
+ (theories Stdlib Flocq
+   ONNXFormalization.External
+   ONNXFormalization.ProtobufDatatypes
+   ONNXFormalization.ProtobufConverter
+   ONNXFormalization.ONNXConverter
+   ONNXFormalization.ONNXEvaluator))
+
+(executable
+ (name onnx_evaluator_runner)
+ (libraries unix))

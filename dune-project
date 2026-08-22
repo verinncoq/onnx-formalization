@@ -9,7 +9,7 @@
 
 (authors "Leo Gummersbach" "Andrei Aleksandrov" "Kim Völlinger")
 
-(maintainers "Andrei Aleksandrov" "Kim Völlinger")
+(maintainers "Andrei Aleksandrov" "Kim Völlinger" "Alessandro Bruni" "Alistair Sirman")
 
 (license APACHE-2.0)
 
@@ -22,4 +22,7 @@
     (ocaml (="4.14.2")) 
     (rocq-core (="9.1.0")) 
     (coq-coquelicot (="3.4.4"))
-    (coq-flocq (= "4.2.2")) ))
+    (coq-flocq (= "4.2.2")) 
+    (pbrt (= "4.1"))
+    (conf-protoc (= "4.4.0"))
+ ))

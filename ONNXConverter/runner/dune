@@ -1,0 +1,8 @@
+(rocq.extraction
+ (prelude onnx_converter_extraction)
+ (extracted_modules rocq_onnx_converter)
+ (theories Stdlib Flocq ONNXFormalization.External ONNXFormalization.ProtobufDatatypes ONNXFormalization.ProtobufConverter ONNXFormalization.ONNXConverter))
+
+(executable
+  (name onnx_converter_runner)
+  (libraries unix))

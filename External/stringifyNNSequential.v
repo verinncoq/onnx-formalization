@@ -5,6 +5,7 @@ From Stdlib Require Import Arith.
 
 From ONNXFormalization.External Require Export intermediate_representation.
 From ONNXFormalization.External Require Export string_to_number.
+From ONNXFormalization.External Require Import add_linefeed.
 
 Open Scope char_scope.
 (*
@@ -235,20 +236,21 @@ Fixpoint addOutput (outputs: list (string * string)) (nnseq: string) : string :=
 
 (*master function. list of NNPremodel nodes gets converted into string for output*)
 Definition stringifyNNPremodelList (l: list NNPremodel) : string :=
-  "(*this file was generated automatically*)
-    From Coq Require Import Strings.String.
-    From Coq Require Import Strings.Ascii.
-
-    From Coq Require Import Reals.
-    From Coquelicot Require Import Coquelicot.
-    From CoqE2EAI Require Import matrix_extensions piecewise_affine neuron_functions.
-    From CoqE2EAI Require Import neural_networks.
-    From CoqE2EAI Require Import string_to_number.
-    From CoqE2EAI Require Import transpose_mult_matrix.
-  
-  Open Scope nat_scope.
-
-" ++
+add_linefeed "(* this file was generated automatically by the ONNX converter *)" ++
+add_linefeed "From Stdlib Require Import Strings.String." ++
+add_linefeed "From Stdlib Require Import Strings.Ascii." ++
+add_linefeed "From Stdlib Require Import Reals." ++
+add_linefeed "" ++
+add_linefeed "From Coquelicot Require Import Coquelicot." ++
+add_linefeed "" ++
+add_linefeed "From ONNXFormalization.External Require Import matrix_extensions piecewise_affine neuron_functions." ++
+add_linefeed "From ONNXFormalization.External Require Import neural_networks." ++
+add_linefeed "From ONNXFormalization.External Require Import string_to_number." ++
+add_linefeed "From ONNXFormalization.External Require Import transpose_mult_matrix." ++
+add_linefeed "" ++
+add_linefeed "Open Scope nat_scope." ++
+add_linefeed ""
+++
     String.concat "
 
 " (map (addOutput (allOutputs l)) (map stringifyNNPremodel l)).
