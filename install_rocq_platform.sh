@@ -14,6 +14,7 @@ unzip platform.zip
 
 cd platform-2026.07.0
 expect <<'EOF'
+set timeout -1
 spawn ./coq_platform_make.sh
 expect "Install full"                          { send "b\r" }
 expect "Select package list"                   { send "1\r" }
