@@ -15,14 +15,13 @@ unzip platform.zip
 cd platform-2026.07.0
 expect <<'EOF'
 spawn ./coq_platform_make.sh
-expect "Install full"                    { send "b\r" }
-expect "Select package list"             { send "1\r" }
-expect "Build opam packages parallel"    { send "s\r" }
-expect "Number of parallel make jobs"   { send "1\r" }
-expect "## Where should it be installed ?" { send "\r" }
-expect "\[1/2/3/4\]"                   { send "1\r" }
-expect "Do you want to continue?" { send "Y\r" }
-expect eof
+expect "Install full"                          { send "b\r" }
+expect "Select package list"                   { send "1\r" }
+expect "Build opam packages parallel"          { send "s\r" }
+expect "Number of parallel make jobs"         { send "1\r" }
+expect "## Where should it be installed ?"     { send "\r" }
+expect "Set the new opam switch as default now (y/n)?" { send "y\r" }
+expect "set as default!"
 EOF
 
 eval $(opam env)
