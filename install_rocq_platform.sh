@@ -16,9 +16,9 @@ cd platform-2026.07.0
 expect <<'EOF'
 spawn ./coq_platform_make.sh
 expect "Install full"                    { send "b\r" }
-expect "Select package list"             { send "18\r" }
-expect "Build opam packages parallel"    { send "p\r" }
-expect "Number of parallel make jobs"   { send "4\r" }
+expect "Select package list"             { send "1\r" }
+expect "Build opam packages parallel"    { send "s\r" }
+expect "Number of parallel make jobs"   { send "1\r" }
 expect "Install non open source SW CompCert" { send "n\r" }
 expect "Include (i) exclude (e) or select (s) large packages" { send "e\r" }
 expect "Install VST"                     { send "n\r" }
