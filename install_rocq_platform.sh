@@ -21,7 +21,15 @@ export COQ_PLATFORM_LARGE="e"
 export COQ_PLATFORM_VST="n"
 
 cd platform-2026.07.0
-expect -c 'spawn ./coq_platform_make.sh; expect "Where should it be installed"; send "\r"; expect eof'
+expect <<'EOF'
+spawn ./coq_platform_make.sh
+expect {
+  "\[1/2/3/4\]" { send "1\r"; exp_continue }
+  "- Do you want to continue?" { send "Y\r"; exp_continue }
+  "Where should it be installed" { send "\r"; exp_continue }
+  eof
+}
+EOF
 
 eval $(opam env)
 
