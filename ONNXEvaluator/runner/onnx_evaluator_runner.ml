@@ -88,16 +88,16 @@ let int32_to_positive (bits: int32) : Rocq_onnx_evaluator.positive =
 let ocaml_float32_of_string (s: string) : Rocq_onnx_evaluator.float32 option = 
   try
     let f = float_of_string s in
-    let bits_int32 = Int32.bits_of_float f in
-    (* Convert to unsigned 32-bit representation *)
-    let bits_uint32 = 
-      if bits_int32 < 0l then 
-        Int32.add bits_int32 (Int32.shift_left 1l 31)
-      else 
-        bits_int32
+    (* Raw single-precision bit pattern, used as-is: int32_to_positive reads
+       all 32 bits via logical shifts. The previous "unsigned" adjustment
+       cleared bit 31 and dropped the sign of every negative float. The
+       all-zero pattern (+0.0) maps to Z0, since positive cannot represent 0. *)
+    let bits = Int32.bits_of_float f in
+    let z =
+      if bits = 0l then Rocq_onnx_evaluator.Z0
+      else Rocq_onnx_evaluator.Zpos (int32_to_positive bits)
     in
-    let pos = int32_to_positive bits_uint32 in
-    Some (Rocq_onnx_evaluator.b32_of_bits (Rocq_onnx_evaluator.Zpos pos))
+    Some (Rocq_onnx_evaluator.b32_of_bits z)
   with _ -> None
 
 (* OCaml implementation of int64_of_string *)
