@@ -19,7 +19,7 @@ expect "Install full"                    { send "b\r" }
 expect "Select package list"             { send "1\r" }
 expect "Build opam packages parallel"    { send "s\r" }
 expect "Number of parallel make jobs"   { send "1\r" }
-expect "## Where should it be installed ? [/usr/local/bin]" { send "\r" }
+expect "## Where should it be installed ?" { send "\r" }
 expect "Install non open source SW CompCert" { send "n\r" }
 expect "Include (i) exclude (e) or select (s) large packages" { send "e\r" }
 expect "Install VST"                     { send "n\r" }
