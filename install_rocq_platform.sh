@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-apt update
-apt install -y unzip build-essential expect
+sudo apt update
+sudo apt install -y unzip build-essential expect
 
 ORIGINAL_DIR=$(pwd)
 
@@ -12,21 +12,19 @@ cd ./tmp-install
 curl -L -o platform.zip https://github.com/coq/platform/archive/refs/tags/2026.07.0.zip
 unzip platform.zip
 
-#Pre-answer questions in the script
-export COQ_PLATFORM_RELEASE="f"
-export COQ_PLATFORM_PACKAGE_PICK_FILE="package_picks/package-pick-9.1~2026.01.sh"
-export COQ_PLATFORM_PARALLEL="p"
-export COQ_PLATFORM_JOBS="4"
-export COQ_PLATFORM_COMPCERT="n"
-export COQ_PLATFORM_LARGE="e"
-export COQ_PLATFORM_VST="n"
-
 cd platform-2026.07.0
 expect <<'EOF'
 spawn ./coq_platform_make.sh
 expect {
+  "Install full" { send "b\r"; exp_continue }
+  "Select package list" { send "1\r"; exp_continue }
+  "Build opam packages parallel" { send "p\r"; exp_continue }
+  "Number of parallel make jobs" { send "4\r"; exp_continue }
+  "Install non open source SW CompCert" { send "n\r"; exp_continue }
+  "Include (i) exclude (e) or select (s) large packages" { send "e\r"; exp_continue }
+  "Install VST" { send "n\r"; exp_continue }
   "\[1/2/3/4\]" { send "1\r"; exp_continue }
-  "- Do you want to continue?" { send "Y\r"; exp_continue }
+  -glob "*Do you want to continue?*" { send "Y\r"; exp_continue }
   "Where should it be installed" { send "\r"; exp_continue }
   eof
 }
