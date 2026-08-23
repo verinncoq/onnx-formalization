@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+apt update
 apt install -y unzip build-essential expect
 
 ORIGINAL_DIR=$(pwd)
