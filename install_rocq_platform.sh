@@ -24,7 +24,7 @@ expect "Include (i) exclude (e) or select (s) large packages" { send "e\r" }
 expect "Install VST"                     { send "n\r" }
 expect "\[1/2/3/4\]"                   { send "1\r" }
 expect -glob "*Do you want to continue?*" { send "Y\r" }
-expect "Where should it be installed"     { send "\r" }
+expect "## Where should it be installed ? [/usr/local/bin]" { send "\r" }
 expect eof
 EOF
 
