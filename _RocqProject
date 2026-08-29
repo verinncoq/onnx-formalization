@@ -3,3 +3,5 @@
 -R ./_build/default/ProtobufDatatypes/ ONNXFormalization.ProtobufDatatypes
 -R ./_build/default/ONNXConverter/theory/ ONNXFormalization.ONNXConverter
 -R ./_build/default/ONNXEvaluator/theory/ ONNXFormalization.ONNXEvaluator
+-R ./_build/default/VNN-LIB/Core/ ONNXFormalization.VNNLIB.Core
+-R ./_build/default/VNN-LIB/ONNX/ ONNXFormalization.VNNLIB.ONNX

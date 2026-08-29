@@ -1,0 +1,9 @@
+(rocq.theory
+  (name ONNXFormalization.VNNLIB.Core)
+  (theories Stdlib micromega_plugin Flocq mathcomp
+    ONNXFormalization.External 
+    ONNXFormalization.ProtobufDatatypes
+    ONNXFormalization.ProtobufConverter
+    ONNXFormalization.VNNLIB.ONNX
+  )
+  (package onnxformalization))
