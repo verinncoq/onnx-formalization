@@ -4,5 +4,7 @@
     ONNXFormalization.External 
     ONNXFormalization.ProtobufDatatypes
     ONNXFormalization.ProtobufConverter
+    ONNXFormalization.ONNXConverter
+    ONNXFormalization.ONNXEvaluator
   )
   (package onnxformalization))
