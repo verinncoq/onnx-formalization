@@ -42,6 +42,10 @@ Fixpoint convert_to_row_major {T: Type} (m: matrix T) : list T :=
   | h::t => h ++ (convert_to_row_major t)
   end.
 
+(*computes the logical AND of all elements in a bool matrix*)
+Definition matrix_and (m: matrix bool) : bool :=
+  fold_left andb (convert_to_row_major m) true.
+
 (*with the help of chat-gpt; returns the j'th column of m*)
 Fixpoint get_column {T: Type} (m : matrix T) (j : nat) : error_option (list T) :=
   match m with
@@ -231,7 +235,77 @@ Definition scale_matrix_float32 (a: matrix float32) (s: float32) : matrix float3
 Definition string_matrix_of_matrix_float32 (m: matrix float32) : matrix string :=
   map (map string_of_float32) m.
 
+(*pointwise comparison operators for float32, following IEEE-754 semantics via
+  b32_compare: NaN compares unordered, so eq/lt/le/gt/ge are false and neq is
+  true whenever either operand is NaN*)
 
+Section Binary.
+Context {prec emax : Z}.
+
+Definition binary_eq (x y : Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Eq => true
+  | _ => false
+  end.
+
+Definition binary_neq (x y: Binary.binary_float prec emax) : bool := negb (binary_eq x y).
+
+Definition binary_lt (x y: Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Lt => true
+  | _ => false
+  end.
+
+Definition binary_le (x y: Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Lt | Some Eq => true
+  | _ => false
+  end.
+
+Definition binary_gt (x y: Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Gt => true
+  | _ => false
+  end.
+
+Definition binary_ge (x y: Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Gt | Some Eq => true
+  | _ => false
+  end.
+
+(*computes the pairwise comparison of two lists, using op to compare elements*)
+Fixpoint compare_lists_binary
+(op: Binary.binary_float prec emax -> Binary.binary_float prec emax -> bool)
+(a b: list (Binary.binary_float prec emax))
+  : error_option (list bool) :=
+  match a, b with
+  | [], [] => Success []
+  | h1::t1, h2::t2 => match compare_lists_binary op t1 t2 with
+    | Success recursive => Success ((op h1 h2)::recursive)
+    | Error e => Error e
+    end
+  | _, _ => Error "Compare lists: lists must have the same length"
+  end.
+
+(*computes the pairwise comparison of two matrices, using op to compare elements*)
+Fixpoint matrix_compare_binary
+(op: Binary.binary_float prec emax -> Binary.binary_float prec emax -> bool)
+(a b: matrix (Binary.binary_float prec emax))
+  : error_option (matrix bool) :=
+  match a, b with
+  | [], [] => Success []
+  | ha::ta, hb::tb => match compare_lists_binary op ha hb with
+    | Success new => match matrix_compare_binary op ta tb with
+      | Success recursive => Success (new::recursive)
+      | Error e => Error e
+      end
+    | Error e => Error e
+    end
+  | _, _ => Error "Matrix comparison: matrices must have the same shape"
+  end.
+
+End Binary.
 
 (*int32*)
 
@@ -323,6 +397,40 @@ Definition scale_matrix_int32 (a: matrix int32) (s: int32) : error_option (matri
 (*converts the whole matrix into a readable string*)
 Definition string_matrix_of_matrix_int32 (m: matrix int32) : matrix string :=
   map (map string_of_int32) m.
+
+(*pointwise comparison operators for int32*)
+
+Definition int32_eq (x y: int32) : bool := Z.eqb (Z_of_int32 x) (Z_of_int32 y).
+Definition int32_neq (x y: int32) : bool := negb (int32_eq x y).
+Definition int32_lt (x y: int32) : bool := Z.ltb (Z_of_int32 x) (Z_of_int32 y).
+Definition int32_le (x y: int32) : bool := Z.leb (Z_of_int32 x) (Z_of_int32 y).
+Definition int32_gt (x y: int32) : bool := Z.ltb (Z_of_int32 y) (Z_of_int32 x).
+Definition int32_ge (x y: int32) : bool := Z.leb (Z_of_int32 y) (Z_of_int32 x).
+
+(*computes the pairwise comparison of two lists, using op to compare elements*)
+Fixpoint compare_lists_int32 (op: int32 -> int32 -> bool) (a b: list int32) : error_option (list bool) :=
+  match a, b with
+  | [], [] => Success []
+  | h1::t1, h2::t2 => match compare_lists_int32 op t1 t2 with
+    | Success recursive => Success ((op h1 h2)::recursive)
+    | Error e => Error e
+    end
+  | _, _ => Error "Compare lists: lists must have the same length"
+  end.
+
+(*computes the pairwise comparison of two matrices, using op to compare elements*)
+Fixpoint matrix_compare_int32 (op: int32 -> int32 -> bool) (a b: matrix int32) : error_option (matrix bool) :=
+  match a, b with
+  | [], [] => Success []
+  | ha::ta, hb::tb => match compare_lists_int32 op ha hb with
+    | Success new => match matrix_compare_int32 op ta tb with
+      | Success recursive => Success (new::recursive)
+      | Error e => Error e
+      end
+    | Error e => Error e
+    end
+  | _, _ => Error "Matrix comparison: matrices must have the same shape"
+  end.
 
 
 
@@ -417,3 +525,75 @@ Definition scale_matrix_int64 (a: matrix int64) (s: int64) : error_option (matri
 (*converts the whole matrix into a readable string*)
 Definition string_matrix_of_matrix_int64 (m: matrix int64) : matrix string :=
   map (map string_of_int64) m.
+
+(*pointwise comparison operators for int64*)
+
+Definition int64_eq (x y: int64) : bool := Z.eqb (Z_of_int64 x) (Z_of_int64 y).
+Definition int64_neq (x y: int64) : bool := negb (int64_eq x y).
+Definition int64_lt (x y: int64) : bool := Z.ltb (Z_of_int64 x) (Z_of_int64 y).
+Definition int64_le (x y: int64) : bool := Z.leb (Z_of_int64 x) (Z_of_int64 y).
+Definition int64_gt (x y: int64) : bool := Z.ltb (Z_of_int64 y) (Z_of_int64 x).
+Definition int64_ge (x y: int64) : bool := Z.leb (Z_of_int64 y) (Z_of_int64 x).
+
+(*computes the pairwise comparison of two lists, using op to compare elements*)
+Fixpoint compare_lists_int64 (op: int64 -> int64 -> bool) (a b: list int64) : error_option (list bool) :=
+  match a, b with
+  | [], [] => Success []
+  | h1::t1, h2::t2 => match compare_lists_int64 op t1 t2 with
+    | Success recursive => Success ((op h1 h2)::recursive)
+    | Error e => Error e
+    end
+  | _, _ => Error "Compare lists: lists must have the same length"
+  end.
+
+(*computes the pairwise comparison of two matrices, using op to compare elements*)
+Fixpoint matrix_compare_int64 (op: int64 -> int64 -> bool) (a b: matrix int64) : error_option (matrix bool) :=
+  match a, b with
+  | [], [] => Success []
+  | ha::ta, hb::tb => match compare_lists_int64 op ha hb with
+    | Success new => match matrix_compare_int64 op ta tb with
+      | Success recursive => Success (new::recursive)
+      | Error e => Error e
+      end
+    | Error e => Error e
+    end
+  | _, _ => Error "Matrix comparison: matrices must have the same shape"
+  end.
+
+
+
+(*uint64*)
+
+(*pointwise comparison operators for uint64*)
+
+Definition uint64_eq (x y: uint64) : bool := Z.eqb (Z_of_uint64 x) (Z_of_uint64 y).
+Definition uint64_neq (x y: uint64) : bool := negb (uint64_eq x y).
+Definition uint64_lt (x y: uint64) : bool := Z.ltb (Z_of_uint64 x) (Z_of_uint64 y).
+Definition uint64_le (x y: uint64) : bool := Z.leb (Z_of_uint64 x) (Z_of_uint64 y).
+Definition uint64_gt (x y: uint64) : bool := Z.ltb (Z_of_uint64 y) (Z_of_uint64 x).
+Definition uint64_ge (x y: uint64) : bool := Z.leb (Z_of_uint64 y) (Z_of_uint64 x).
+
+(*computes the pairwise comparison of two lists, using op to compare elements*)
+Fixpoint compare_lists_uint64 (op: uint64 -> uint64 -> bool) (a b: list uint64) : error_option (list bool) :=
+  match a, b with
+  | [], [] => Success []
+  | h1::t1, h2::t2 => match compare_lists_uint64 op t1 t2 with
+    | Success recursive => Success ((op h1 h2)::recursive)
+    | Error e => Error e
+    end
+  | _, _ => Error "Compare lists: lists must have the same length"
+  end.
+
+(*computes the pairwise comparison of two matrices, using op to compare elements*)
+Fixpoint matrix_compare_uint64 (op: uint64 -> uint64 -> bool) (a b: matrix uint64) : error_option (matrix bool) :=
+  match a, b with
+  | [], [] => Success []
+  | ha::ta, hb::tb => match compare_lists_uint64 op ha hb with
+    | Success new => match matrix_compare_uint64 op ta tb with
+      | Success recursive => Success (new::recursive)
+      | Error e => Error e
+      end
+    | Error e => Error e
+    end
+  | _, _ => Error "Matrix comparison: matrices must have the same shape"
+  end.

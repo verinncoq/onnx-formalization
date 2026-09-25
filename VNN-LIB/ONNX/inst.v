@@ -10,7 +10,7 @@ From ONNXFormalization.ProtobufDatatypes Require Export int.
 From ONNXFormalization.ProtobufDatatypes Require Export bytes.
 From Flocq Require Import Bits.
 From ONNXFormalization.VNNLIB.ONNX Require Import Syntax Semantics.
-From ONNXFormalization.ONNXEvaluator Require Import onnx_evaluator.
+From ONNXFormalization.ONNXEvaluator Require Import onnx_evaluator op_comp.
 Import Order.TTheory.
 Import Order.DefaultSeqProdOrder.
 Import Order.DefaultProdOrder.
@@ -1423,45 +1423,47 @@ Proof. by case: x. Qed.
 Definition s_all2 {S T : Type} (op : S -> T -> bool) (s1 : seq S) (s2 : seq T) : bool :=
   (size s1 == size s2) && (all2 op s1 s2).
 
-Definition tensor_le (t1 t2 : TensorProto) : bool :=
-match t1, t2 with
-| TensorProto_constructor dims1 data_type1 segment1 float_data1 int32_data1 string_data1 int64_data1 name1 _ raw1 ext1 _ double_data1 uint64_data1 _,
-  TensorProto_constructor dims2 data_type2 segment2 float_data2 int32_data2 string_data2 int64_data2 name2 _ raw2 ext2 _ double_data2 uint64_data2 _ =>
-    if opt_eq data_type1 data_type2 then false else
-    match data_type1 with
-    | None => false
-    | Some data_type =>
-             match Z_of_int32 data_type with
-             (* | 1 => (float_data1 <= float_data2)%O (** Some FLOAT_TensorProto **) *)
-             | 1 => s_all2 (binary_le 24 128) float_data1 float_data2
-             | 6 => (int32_data1 <= int32_data2)%O (** Some INT32_TensorProto **)
-             | 7 => (int64_data1 <= int64_data2)%O (** Some INT64_TensorProto **)
-             | 8 => (string_data1 <= string_data2)%O (** Some STRING_TensorProto **) (** TODO: Check if the naive string le is correct **)
-             (* | 11 =>  (double_data1 <= double_data2)%O (** Some DOUBLE_TensorProto **) *)
-             | 11 => s_all2 (binary_le 53 1024) double_data1 double_data2
-             | 13 => (uint64_data1 <= uint64_data2)%O (** Some UINT64_TensorProto **)
-             | _ => false
-             end%Z
-    end
+Definition TensorProto_le (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
+  fun t1 t2 =>
+    match le_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
+    | Success x => x
+    | Error x => false
+    end.
+
+Definition TensorProto_lt (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
+  fun t1 t2 =>
+match lt_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
+| Success x => x
+| Error x => false
 end.
 
-Lemma TensorProto_le (d : TensorType (ElementType syntax_inst)) : TensorComp denote d.
-Admitted.
+Definition TensorProto_ge (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
+  fun t1 t2 =>
+    match ge_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
+    | Success x => x
+    | Error x => false
+    end.
 
-Lemma TensorProto_lt (d : TensorType (ElementType syntax_inst)) : TensorComp denote d.
-Admitted.
+Definition TensorProto_gt (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
+  fun t1 t2 =>
+    match gt_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
+    | Success x => x
+    | Error x => false
+    end.
 
-Lemma TensorProto_ge (d : TensorType (ElementType syntax_inst)) : TensorComp denote d.
-Admitted.
+Definition TensorProto_eq (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
+fun t1 t2 =>
+    match eq_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
+    | Success x => x
+    | Error x => false
+    end.
 
-Lemma TensorProto_gt (d : TensorType (ElementType syntax_inst)) : TensorComp denote d.
-Admitted.
-
-Lemma TensorProto_eq (d : TensorType (ElementType syntax_inst)) : TensorComp denote d.
-Admitted.
-
-Lemma TensorProto_neq (d : TensorType (ElementType syntax_inst)) : TensorComp denote d.
-Admitted.
+Definition TensorProto_neq (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
+  fun t1 t2 =>
+    match neq_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
+    | Success x => x
+    | Error x => false
+    end.
 
 Definition zero_tensor (t : TensorProto) : TensorProto.
 case: t => dims data_type segment float_data int32_data string_data int64_data name doc_string raw ext data_loc double_data uint64_data metadata.
