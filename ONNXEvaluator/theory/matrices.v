@@ -227,6 +227,9 @@ Fixpoint matrix_addition_float32 (a b : matrix float32) : error_option (matrix f
   | _, _ => Error "Matrix addition: matrices must have the same shape"
   end.
 
+Definition scale_list_float32 (a : list float32) (s : float32) : list float32 :=
+  map (b32_mult mode_NE s) a.
+
 (*scales the matrix by a factor s*)
 Definition scale_matrix_float32 (a: matrix float32) (s: float32) : matrix float32 :=
   map (map (b32_mult mode_NE s)) a.
@@ -382,6 +385,15 @@ Fixpoint matrix_addition_int32 (a b : matrix int32) : error_option (matrix int32
   | _, _ => Error "Matrix addition: matrices must have the same shape"
   end.
 
+Definition scale_list_int32 (a : list int32) (s : int32) : error_option (list int32) :=
+  let z_list := map Z_of_int32 a in
+  let scaled_z_list := map (Z.mul (Z_of_int32 s)) z_list in
+  let result_option := map int32_of_Z scaled_z_list in
+  match option_list_of_list_option result_option with
+  | Some result => Success result
+  | None => Error "List scaling results in overflow"
+  end.
+
 (*scales the matrix by a factor s*)
 Definition scale_matrix_int32 (a: matrix int32) (s: int32) : error_option (matrix int32) :=
   let z_matrix := map (map Z_of_int32) a in
@@ -508,6 +520,15 @@ Fixpoint matrix_addition_int64 (a b : matrix int64) : error_option (matrix int64
     | Error e => Error e
     end
   | _, _ => Error "Matrix addition: matrices must have the same shape"
+  end.
+
+Definition scale_list_int64 (a : list int64) (s : int64) : error_option (list int64) :=
+  let z_list := map Z_of_int64 a in
+  let scaled_z_list := map (Z.mul (Z_of_int64 s)) z_list in
+  let result_option := map int64_of_Z scaled_z_list in
+  match option_list_of_list_option result_option with
+  | Some result => Success result
+  | None => Error "List scaling results in overflow"
   end.
 
 (*scales the matrix by a factor s*)

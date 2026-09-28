@@ -27,8 +27,8 @@ end.
 Definition TensorOp1 (n : TensorType ElementType) :=
 TensorSemantics n -> TensorSemantics n.
 
-Definition TensorOp2 (n : TensorType ElementType) :=
-TensorSemantics n -> TensorSemantics n -> TensorSemantics n.
+Definition TensorOp2 (n : TensorType ElementType)
+:= TensorSemantics n -> TensorSemantics n -> TensorSemantics n.
 
 Definition TensorComp (n : TensorType ElementType) :=
 TensorSemantics n -> TensorSemantics n -> bool.

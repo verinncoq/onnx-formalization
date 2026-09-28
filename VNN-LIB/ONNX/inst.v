@@ -10,7 +10,7 @@ From ONNXFormalization.ProtobufDatatypes Require Export int.
 From ONNXFormalization.ProtobufDatatypes Require Export bytes.
 From Flocq Require Import Bits.
 From ONNXFormalization.VNNLIB.ONNX Require Import Syntax Semantics.
-From ONNXFormalization.ONNXEvaluator Require Import onnx_evaluator op_comp.
+From ONNXFormalization.ONNXEvaluator Require Import onnx_evaluator op_comp op_add op_matmul op_neg.
 Import Order.TTheory.
 Import Order.DefaultSeqProdOrder.
 Import Order.DefaultProdOrder.
@@ -188,7 +188,7 @@ Definition binary_lt : rel (Binary.binary_float prec emax) :=
     | Binary.B754_zero s, Binary.B754_zero s' => s && ~~ s'
     | Binary.B754_infinity s, Binary.B754_infinity s' => s && ~~ s'
     | Binary.B754_nan s m e, Binary.B754_nan s' m' e' => s && ~~ s'
-    | Binary.B754_finite s m e x, Binary.B754_finite s' m' e' x' => (s == s') && (m =? m')%positive && (e <? e')
+    | Binary.B754_finite s m e x, Binary.B754_finite s' m' e' x' => (s == s') && (m =? m')%positive && (e <? e')%Z
     | _, _ => false
     end.
 
@@ -219,7 +219,7 @@ case: y => //=.
   rewrite /binary_le.
   rewrite /binary_lt /= H Pos.eqb_sym H /=.
   rewrite negb_or.
-  case H': (e' <? e) => /=.
+  case H': (e' <? e)%Z => /=.
   symmetry.
   apply/and3P; split.
   by apply/orP; right.
@@ -242,7 +242,7 @@ case: y => //=.
   rewrite /binary_le /= H0 Pos.eqb_sym H0.
   rewrite !Bool.andb_true_l.
   rewrite negb_or.
-  case H1: (e' <? e) => //=.
+  case H1: (e' <? e)%Z => //=.
   symmetry.
   apply/and3P; split.
   by apply/orP; right.
@@ -422,48 +422,11 @@ Qed.
 HB.instance Definition _ := hasDecEq.Build string stringEqP.
 
 Definition supported_types : seq DataType_TensorProto :=
-  [:: FLOAT_TensorProto; INT32_TensorProto; INT64_TensorProto;
-   STRING_TensorProto; DOUBLE_TensorProto; UINT64_TensorProto].
+  [:: FLOAT_TensorProto; INT32_TensorProto; INT64_TensorProto].
 
 Definition Elem : eqType := { x in supported_types }.
 
 Axiom TEMP : {k : nat & {posnum nat} ^ k} -> seq int64.
-
-(* Definition Tensor (t : TensorType Elem) : TensorProto := *)
-(*   match t with *)
-(*   | tensorType tensorTypes tensorDims => *)
-(*       match tensorTypes with *)
-(*       | exist x Px => *)
-(*           match x as x0 return (x0 \in supported_types) -> TensorProto with *)
-(*           | FLOAT_TensorProto => fun=> *)
-(*                                   TensorProto_constructor *)
-(*                                     (TEMP tensorDims) (*dims*) *)
-(*                                     (int32_of_Z 0) (* TODO: data_type*) *)
-(*                                     None (* TODO: segment*) *)
-(*                                     (denote tensorTypes) (*float_data*) *)
-(*                                     nil (*int32_data*) *)
-(*                                     nil (*string_data*) *)
-(*                                     nil (*int64_data*) *)
-(*                                     None (* TODO: name*) *)
-(*                                     None (* TODO: doc_string*) *)
-(*                                     None (*raw_data*) *)
-(*                                     nil (* TODO: external_data*) *)
-(*                                     nil (* TODO: data_location*) *)
-(*                                     nil (*double_data*) *)
-(*                                     nil (*uint64_data*) *)
-(*                                     nil (* TODO: metadata_props*) *)
-
-
-(*           | INT32_TensorProto => fun=> list int32 *)
-(*           | INT64_TensorProto => fun=> list int64 *)
-(*           | STRING_TensorProto => fun=> option string *)
-(*           | DOUBLE_TensorProto => fun=> list float64 *)
-(*           | UINT64_TensorProto => fun=> list uint64 *)
-(*           | _ => fun Px => False_rect TensorProto (notF Px) *)
-(*           end *)
-(*       end *)
-(*   end. *)
-  (* denote (val (tensorTypes _ t)). *)
 
 Definition Segment_TensorProtoEq : rel Segment_TensorProto :=
   fun s1 s2 =>
@@ -1159,12 +1122,19 @@ Definition mOutputs (y : NetworkType Elem) (m : ModelProto)
   existT _ u (producing_node m u).
 
 
-(** TODO: This is not correct, it checks the graphs are the same, not the structure of the graph **)
 Definition is_iso (y1 y2 : NetworkType Elem) (m1 : ModelProto)
 (H : NetworkShapesMatch y1 y2) (m2 : ModelProto) : bool :=
 match m1, m2 with
 | ModelProto_constructor _ _ _ _ _ _ _ x _ _ _ _,
-  ModelProto_constructor _ _ _ _ _ _ _ x' _ _ _ _ => x == x'
+  ModelProto_constructor _ _ _ _ _ _ _ x' _ _ _ _ =>
+    match x, x' with
+    | Some y, Some y' =>
+        match y, y' with
+        | GraphProto_constructor n _ _ _ _ _ _ _ _ _,
+          GraphProto_constructor n' _ _ _ _ _ _ _ _ _ => n == n'
+        end
+    | _, _ => false
+    end
 end.
 
 Definition is_eq (y1 y2 : NetworkType Elem) (m1 : ModelProto)
@@ -1236,12 +1206,6 @@ case: x H => //= H.
   exact: (\col_i nth (Byte.x00, Byte.x00, Byte.x00, Byte.x00) int32 i).
 - apply: Tensor; rewrite big_ord0.
   exact: (\col_i nth (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00) int64 i).
-- apply: Tensor; rewrite big_ord0.
-  exact: (\col_i nth ""%string (map string_of_bytes string) i).
-- apply: Tensor; rewrite big_ord0.
-  exact: (\col_i nth (Binary.B754_zero 53 1024 false) double_data i).
-- apply: Tensor; rewrite big_ord0.
-  exact: (\col_i nth (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00) uint64_data i).
 Defined.
 
 
@@ -1264,7 +1228,7 @@ Defined.
 
 Definition read_tensor {R : eqType} {k : nat} (dims : {posnum nat}^k) (t : 'nT[R]_(dims))
   : seq R :=
-  let cols_eq : \prod_(j < 0) ([tuple] j)%:posnum = 1%N := big_ord0 _ _ _ _ in
+  let cols_eq : \prod_(j < 0) ([tuple] j)%:posnum = 1%R := big_ord0 _ _ _ _ in
   [seq val t i (cast_ord (esym cols_eq) ord0) | i <- fintype.enum 'I_(\prod_(l < k) (dims l)%:num)].
 
 Definition default_TensorProto : TensorProto :=
@@ -1294,12 +1258,6 @@ case: x Px => //= Px v.
             nil (read_tensor dims v) nil nil None None None nil None nil nil nil).
 - exact: (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 7) None
             nil nil nil (read_tensor dims v) None None None nil None nil nil nil).
-- exact: (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 8) None
-            nil nil (map string_to_bytes (read_tensor dims v)) nil None None None nil None nil nil nil).
-- exact: (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 11) None
-            nil nil nil nil None None None nil None (read_tensor dims v) nil nil).
-- exact: (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 13) None
-            nil nil nil nil None None None nil None nil (read_tensor dims v) nil).
 Defined.
 
 Definition TensorProto_to_Semantics (d : TensorType Elem) (t : TensorProto) : TensorSemantics denote d.
@@ -1310,9 +1268,6 @@ case: x Px => //= Px.
 - exact: (build_tensor (Binary.B754_zero 24 128 false : float32) dims float_data).
 - exact: (build_tensor int32_zero dims int32_data).
 - exact: (build_tensor int64_zero dims int64_data).
-- exact: (build_tensor ""%string dims (map string_of_bytes string_data)).
-- exact: (build_tensor (Binary.B754_zero 53 1024 false : float64) dims double_data).
-- exact: (build_tensor int64_zero dims uint64_data).
 Defined.
 
 (*
@@ -1426,44 +1381,41 @@ Definition s_all2 {S T : Type} (op : S -> T -> bool) (s1 : seq S) (s2 : seq T) :
 Definition TensorProto_le (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
   fun t1 t2 =>
     match le_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
-    | Success x => x
+    | Success x => matrix_and x
     | Error x => false
     end.
 
 Definition TensorProto_lt (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
   fun t1 t2 =>
 match lt_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
-| Success x => x
+| Success x => matrix_and x
 | Error x => false
 end.
 
 Definition TensorProto_ge (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
   fun t1 t2 =>
     match ge_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
-    | Success x => x
+    | Success x => matrix_and x
     | Error x => false
     end.
 
 Definition TensorProto_gt (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
   fun t1 t2 =>
     match gt_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
-    | Success x => x
+    | Success x => matrix_and x
     | Error x => false
     end.
 
 Definition TensorProto_eq (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
 fun t1 t2 =>
     match eq_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
-    | Success x => x
+    | Success x => matrix_and x
     | Error x => false
     end.
 
 Definition TensorProto_neq (d : TensorType (ElementType syntax_inst)) : TensorComp denote d :=
   fun t1 t2 =>
-    match neq_tensor (Semantics_to_TensorProto d t1) (Semantics_to_TensorProto d t2) with
-    | Success x => x
-    | Error x => false
-    end.
+  negb (TensorProto_eq d t1 t2).
 
 Definition zero_tensor (t : TensorProto) : TensorProto.
 case: t => dims data_type segment float_data int32_data string_data int64_data name doc_string raw ext data_loc double_data uint64_data metadata.
@@ -1488,34 +1440,57 @@ exact: (map (fun _ => (x00, x00, x00, x00, x00, x00, x00, x00)) uint64_data).
 exact:metadata.
 Defined.
 
-Definition minus_one : float32 := b32_of_bits 3212836864.
-
-(** TODO: Desirable but not required **)
-Lemma gemm_correct (d : TensorType (ElementType syntax_inst))
-(t1 t2 t3 : TensorSemantics denote d)
-  : exists t : TensorProto, gemm (Semantics_to_TensorProto d t1)
-                       (Semantics_to_TensorProto d t2)
-                       (Semantics_to_TensorProto d t3) [::] = Success t.
-Admitted.
-
-
 Definition TensorProto_neg (d : TensorType (ElementType syntax_inst)) : TensorOp1 denote d.
 Proof.
 move=> /(Semantics_to_TensorProto d) t.
-(** The attribute setting beta = -1 **)
-have attrib := AttributeProto_constructor (Some "beta") None None (Some FLOAT_AttributeProto) (Some minus_one) None None None None None nil nil nil nil nil nil.
-have := gemm (zero_tensor t) (zero_tensor t) t [:: attrib].
+have := neg_tensor t.
 case.
 move=> t'.
-exact: (TensorProto_to_Semantics d t).
+exact: (TensorProto_to_Semantics d t').
 move=> _.
 exact: (TensorProto_to_Semantics d (zero_tensor t)).
 Defined.
 
+Lemma add_lists_float32_sized {s1 s2 : seq float32}
+  : size s1 = size s2 -> exists s3,
+add_lists_float32 s1 s2 = Success s3.
+Proof.
+move=> H.
+elim: s2 s1 H=> //= [[|//=] | x xs IHx [//| y ys] /= H]; first by exists [::].
+have [z ->]:= (IHx ys (eq_add_S _ _ H)).
+by exists (b32_plus BinarySingleNaN.mode_NE y x :: z)%SEQ.
+Qed.
+
+(* TODO: There is no overflow protection in the type so this cant be done *)
+(* Lemma add_lists_int32_sized {s1 s2 : seq int32} *)
+(*   : size s1 = size s2 -> exists s3, *)
+(* add_lists_int32 s1 s2 = Success s3. *)
+(* Proof. *)
+(* move=> H. *)
+(* elim: s2 s1 H=> //= [[|//=] | x xs IHx [//| y ys] /= H]; first by exists [::]. *)
+(* have [z ->]:= (IHx ys (eq_add_S _ _ H)). *)
+(* Admitted. *)
+
+(* Lemma add_correct (d : TensorType (ElementType syntax_inst)) *)
+(* (t1 t2 : TensorSemantics denote d) : *)
+(*   exists t, add_tensor (Semantics_to_TensorProto d t1) *)
+(*             (Semantics_to_TensorProto d t2) = Success t. *)
+(* Proof. *)
+(* case: d t1 t2 => /= tensorType [/= k dims] /= t1 t2. *)
+(* rewrite /add_tensor /=. *)
+(* case: tensorType t1 t2. *)
+(* case=> ttin //= t1 t2. *)
+(* suff H: size (read_tensor dims t1) = size (read_tensor dims t2). *)
+(* have [x ->] := add_lists_float32_sized H. *)
+(* by exists (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 1) None x [::] [::] *)
+(*    [::] None None None [::] None [::] [::] [::]). *)
+(* rewrite /read_tensor. *)
+(* Admitted. *)
+
 Definition TensorProto_add (d : TensorType (ElementType syntax_inst)) : TensorOp2 denote d.
 Proof.
 move=> /(Semantics_to_TensorProto d) t1 /(Semantics_to_TensorProto d) t2.
-have := gemm (t1) (zero_tensor t1) t2 [::].
+have := add_tensor t1 t2.
 case => t.
 exact: (TensorProto_to_Semantics d t).
 exact: (TensorProto_to_Semantics d (zero_tensor t1)).
@@ -1525,7 +1500,7 @@ Qed.
 Definition TensorProto_mul (d : TensorType (ElementType syntax_inst)) : TensorOp2 denote d.
 Proof.
 move=> /(Semantics_to_TensorProto d) t1 /(Semantics_to_TensorProto d) t2.
-have := gemm t1 t2 (zero_tensor t2) [::].
+have := matmul_tensor t1 t2.
 case => t.
 exact: (TensorProto_to_Semantics d t).
 exact: (TensorProto_to_Semantics d (zero_tensor t1)).
