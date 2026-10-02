@@ -101,15 +101,18 @@ Definition NetworkShapesMatch {Types1 Types2 : eqType}
   (n1 : NetworkType Types1) (n2 : NetworkType Types2) : bool :=
   match n1, n2 with
     | networkType inputs1 outputs1, networkType inputs2 outputs2 =>
-        [&& all (uncurry TensorShapesMatch) (zip inputs1 inputs2),
-          all (uncurry TensorShapesMatch) (zip outputs1 outputs2),
-          (size inputs1 == size inputs2) &
-          (size outputs1 == size outputs2)]
+        all2 TensorShapesMatch inputs1 inputs2 &&
+          all2 TensorShapesMatch outputs1 outputs2
     end.
 
 Definition NetworkTypesMatch {Types : eqType} (y1 : NetworkType Types)
   (y2 : NetworkType Types) : bool :=
   y1 == y2.
+
+Definition tseq_sub {ElementType : eqType} (s : seq (TensorType ElementType)) := seq_sub s.
+
+HB.instance Definition _ {ElementType : eqType} (s : seq (TensorType ElementType)) :=
+  Finite.copy (tseq_sub s) (adhoc_seq_sub_finType s).
 
 Record NetworkTheorySyntax := {
     ElementType : eqType;
@@ -117,10 +120,16 @@ Record NetworkTheorySyntax := {
     Model : NetworkType ElementType -> eqType;
     NodeOutputName : eqType;
     NodeOutput : forall {y}, Model y -> NodeOutputName -> TensorType ElementType -> eqType;
-    modelOutputs : forall {y} (m : Model y) {d : TensorType ElementType},
-      d \in outputs _ y -> {u : NodeOutputName & NodeOutput m u d};
+    modelOutputs : forall {y} (m : Model y),
+      {dffun forall i : 'I_(size (outputs _ y)),
+           {u : NodeOutputName & NodeOutput m u (tnth (in_tuple (outputs _ y)) i)}};
     iso : forall {y1 y2}, Model y1 -> NetworkShapesMatch y1 y2 -> Model y2 -> bool;
-    equal : forall {y1 y2}, Model y1 -> NetworkTypesMatch y1 y2 -> Model y2 -> bool;
   }.
+
+Definition equal {n} {y1 y2} (m1 : Model n y1) (H : NetworkTypesMatch y1 y2)
+  (m2 : Model n y2) : bool.
+move: H m1 m2 => /eqP ->.
+exact: eq_op.
+Qed.
 
 End Syntax.
