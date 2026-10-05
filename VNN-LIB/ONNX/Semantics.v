@@ -39,7 +39,6 @@ TensorsSemantics inputTypes -> TensorSemantics outputType.
 
 End Semantics.
 
-Section NetworkTheorySemantics.
 Record NetworkTheorySemantics (syn : NetworkTheorySyntax) := {
     elementType : ElementType syn -> eqType;
     theoryTensor : forall {t}, TheoryTensor syn t -> TensorSemantics elementType t;
@@ -55,4 +54,3 @@ Record NetworkTheorySemantics (syn : NetworkTheorySyntax) := {
     add : forall {d}, TensorOp2 elementType d;
     mul : forall {d}, TensorOp2 elementType d
 }.
-End NetworkTheorySemantics.

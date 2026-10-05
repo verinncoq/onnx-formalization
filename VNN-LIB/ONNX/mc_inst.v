@@ -49,8 +49,7 @@ Definition DataType_TensorProtoEq : rel DataType_TensorProto :=
     | INT4_TensorProto, INT4_TensorProto => true
     | FLOAT4E2M1_TensorProto, FLOAT4E2M1_TensorProto => true
     | _, _ => false
-    end
-.
+    end.
 
 Definition DataType_TensorProtoEqP : Equality.axiom DataType_TensorProtoEq.
 Proof.
@@ -268,6 +267,7 @@ Proof.
 Qed.
 
 HB.instance Definition _ := hasDecEq.Build TensorProto TensorProtoEqP.
+
 Definition dim_SimpleShardedDimProtoEq : rel dim_SimpleShardedDimProto :=
   fun x y =>
     match x, y with

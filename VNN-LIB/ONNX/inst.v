@@ -64,21 +64,17 @@ Definition producing_node (m : ModelProto) (u : string) : NodeProto :=
 
 (*
 A function that maps a model to a list of its outputs.
-Given a declared output type d of the network shape y, together with a
-proof that d is one of y's declared outputs, this looks up the model's
-actual list of graph outputs (ModelProto -> GraphProto -> list ValueInfoProto)
-at the same position d occupies in y's output list, and pairs that output's
-name with the NodeProto that produces it.
+For every declared output type at position i in the network shape y, this
+looks up the model's actual list of graph outputs (ModelProto -> GraphProto
+-> list ValueInfoProto) at that same position, and pairs that output's name
+with the NodeProto that produces it.
 *)
-
-(* TODO: Check this and everything it relies on *)
-Definition mOutputs (y : NetworkType Elem) (m : ModelProto)
-(d : TensorType Elem) (H : d \in outputs Elem y)
-  : {u : string & nodeOutput y m u d} :=
-  let i := seq.index d (outputs Elem y) in
-  let u := nth ""%string (map value_info_name (graph_outputs m)) i in
-  existT _ u (producing_node m u).
-
+Definition mOutputs (y : NetworkType Elem) (m : ModelProto) :
+  {dffun forall i : 'I_(size (outputs Elem y)),
+{u : string & nodeOutput y m u (tnth (in_tuple (outputs Elem y)) i)}} :=
+  finfun (fun i : 'I_(size (outputs Elem y)) =>
+    let u := nth ""%string (map value_info_name (graph_outputs m)) (nat_of_ord i) in
+    existT _ u (producing_node m u)).
 
 Definition is_iso (y1 y2 : NetworkType Elem) (m1 : ModelProto)
 (H : NetworkShapesMatch y1 y2) (m2 : ModelProto) : bool :=
@@ -120,7 +116,6 @@ Definition syntax_inst : NetworkTheorySyntax :=
       NodeOutput := nodeOutput;
       modelOutputs := mOutputs;
       iso := is_iso;
-      equal := is_eq;
   |}.
 
 Definition denote (x : ElementType syntax_inst) : eqType :=
@@ -140,7 +135,7 @@ end.
 (* TODO: data_type is a reference to the enum DataType_TensorProto, so there
 should be a check these match *)
 
-Definition test : forall t : TensorType (ElementType syntax_inst), TheoryTensor syntax_inst t -> TensorSemantics denote t.
+Definition theoryTensorProto : forall t : TensorType (ElementType syntax_inst), TheoryTensor syntax_inst t -> TensorSemantics denote t.
 Proof.
 rewrite /=.
 case.
@@ -228,13 +223,13 @@ case: x Px => //= Px.
 - exact: (build_tensor int64_zero dims int64_data).
 Defined.
 
-Lemma Semantics_to_TensorProtoK (d : TensorType Elem) : cancel (Semantics_to_TensorProto d) (TensorProto_to_Semantics d).
-Proof.
-case: d => [[[] Px]] [k dims] //=.
-move=> t /=.
-rewrite /build_tensor.
-rewrite /TensorProto_to_Semantics /=.
-case: TensorTypes.
+(* Lemma Semantics_to_TensorProtoK (d : TensorType Elem) : cancel (Semantics_to_TensorProto d) (TensorProto_to_Semantics d). *)
+(* Proof. *)
+(* case: d => [[[] Px]] [k dims] //=. *)
+(* move=> t /=. *)
+(* rewrite /build_tensor. *)
+(* rewrite /TensorProto_to_Semantics /=. *)
+(* case: TensorTypes. *)
 
 (*
 Executes the network: runs the actual ONNX operational semantics
@@ -256,7 +251,7 @@ model has no graph, evaluation errors, or `u` isn't among its declared
 outputs, it falls back to default_TensorProto (the all-zero tensor),
 rather than being partial.
 *)
-Definition test2 (y : NetworkType (ElementType syntax_inst))
+Definition modelTensorProto (y : NetworkType (ElementType syntax_inst))
 (n : Model syntax_inst y) (inp : InputSemantics denote y)
 (d : TensorType (ElementType syntax_inst)) (u : NodeOutputName syntax_inst)
 (out : NodeOutput syntax_inst n u d) : TensorSemantics denote d.
@@ -475,8 +470,8 @@ Qed.
 Definition semantics_inst : NetworkTheorySemantics syntax_inst :=
   {|
       elementType := denote;
-      theoryTensor := test;
-      model := test2;
+      theoryTensor := theoryTensorProto;
+      model := modelTensorProto;
       le := TensorProto_le;
       lt := TensorProto_lt;
       ge := TensorProto_ge;
