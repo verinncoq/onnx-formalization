@@ -1,14 +1,14 @@
 From ONNXFormalization.VNNLIB.ONNX Require Import Syntax Semantics.
 
-From mathcomp Require Import boot algebra order.
+From mathcomp Require Import boot algebra order reals.
 From mathcomp Require Import interval_inference.
 From HB Require Import structures.
-From Stdlib Require Import Rdefinitions.
-From mathcomp Require Import Rstruct.
+(* From Stdlib Require Import Rdefinitions. *)
+(* From mathcomp Require Import Rstruct. *)
 
 Import EqNotations.
 Section RealSyntax.
-Context {n : NetworkTheorySyntax} {theorySemantics : NetworkTheorySemantics n}.
+Context {n : NetworkTheorySyntax} {theorySemantics : NetworkTheorySemantics n} {R : realType}.
 
 Record RealElementType : Set := real {}.
 
@@ -254,13 +254,13 @@ Section TensorPOrder.
 Import Order.POrderTheory.
 Local Open Scope order_scope.
 
-Context (d : Order.disp_t) (R : porderType d).
+Context (d : Order.disp_t) (T : porderType d).
 Context {l k : nat} (u_ : {posnum nat} ^ k) (d_ : {posnum nat} ^ l).
 
-Definition le_t (t u : 'T[R]_(u_, d_)) :=
+Definition le_t (t u : 'T[T]_(u_, d_)) :=
   [forall ij, (\val t ij.1 ij.2) <= (\val u ij.1 ij.2)].
 
-Definition lt_t (t u : 'T[R]_(u_, d_)) := (u != t) && le_t t u.
+Definition lt_t (t u : 'T[T]_(u_, d_)) := (u != t) && le_t t u.
 
 Let lt_t_def : forall x y, lt_t x y = (y != x) && le_t x y.
 Proof. by []. Qed.
@@ -282,7 +282,7 @@ Proof.
 Qed.
 
 HB.instance Definition _ := Order.isPOrder.Build
-                              d 'T[R]_(u_, d_) lt_t_def le_t_refl le_t_anti le_t_trans.
+                              d 'T[T]_(u_, d_) lt_t_def le_t_refl le_t_anti le_t_trans.
 
 End TensorPOrder.
 
