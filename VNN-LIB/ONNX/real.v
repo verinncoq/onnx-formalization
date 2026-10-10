@@ -223,7 +223,7 @@ Definition realSyntax : NetworkTheorySyntax :=
 Definition realElementTypeInterp (real : RealElementType) : eqType := R.
 
 Definition RealNetworkSemantics : Type :=
-  forall {n y1 y2 d1 d2 u} (m : Model n y1), NetworkShapesMatch y1 y2 ->
+  forall {y1 y2 d1 d2 u} (m : Model n y1), NetworkShapesMatch y1 y2 ->
                                         InputSemantics realElementTypeInterp y2 ->
                                         NodeOutput n m u d1 ->
                                         TensorShapesMatch d1 d2 ->
@@ -244,7 +244,7 @@ Definition realModelInterp (realNetwork : RealNetworkSemantics) {y}
   Proof.
 case: m out => runtimeNetworkType runtimeNetwork sameShape /=.
 case=> runtimeNodeType runtimeNode sameNodeShape.
-apply (realNetwork _ _ _ _ _ _ runtimeNetwork sameShape inp runtimeNode sameNodeShape).
+apply (realNetwork _ _ _ _ _ runtimeNetwork sameShape inp runtimeNode sameNodeShape).
 Qed.
 
 Definition test : ElementType realSyntax := real.

@@ -16,56 +16,7 @@ Import Order.DefaultSeqProdOrder.
 Import Order.DefaultProdOrder.
 Open Scope order_scope.
 Import EqNotations.
-
-HB.about quotType.
-HB.howto quotType.
-HB.about isQuotient.Build.
-
-Inductive qTensor :=
-| qTensorInt32 : list int64 -> option int32 -> option Segment_TensorProto
-                 -> list int32 -> option string -> list StringStringEntryProto -> qTensor
-| qTensorInt64 : list int64 -> option int32 -> option Segment_TensorProto
-                 -> list int64 -> option string -> list StringStringEntryProto -> qTensor
-| qTensorFloat32 : list int64 -> option int32 -> option Segment_TensorProto
-                 -> list float32 -> option string -> list StringStringEntryProto -> qTensor.
-
-Arguments TensorProto_constructor dims data_type segment float_data int32_data string_data int64_data name doc_string raw_data external_data data_location double_data uint64_data metadata_props.
-
-HB.about isQuotient.Build.
-
-Definition qTensor_of_TensorProto (t : TensorProto) : qTensor :=
-match t with
-| TensorProto_constructor dims data_type segment float_data int32_data
-    string_data int64_data name doc_string raw_data external_data data_location
-    double_data uint64_data metadata_props =>
-    match data_type with
-    | 0 => Some UNDEFINED_TensorProto
-    | 1 => qTensorFloat32 dims data_type segment float_data name metadata_props
-    | 2 => Some UINT8_TensorProto
-    | 3 => Some INT8_TensorProto
-    | 4 => Some UINT16_TensorProto
-    | 5 => Some INT16_TensorProto
-    | 6 => Some INT32_TensorProto
-    | 7 => Some INT64_TensorProto
-    | 8 => Some STRING_TensorProto
-    | 9 => Some BOOL_TensorProto
-    | 10 => Some FLOAT16_TensorProto
-    | 11 => Some DOUBLE_TensorProto
-    | 12 => Some UINT32_TensorProto
-    | 13 => Some UINT64_TensorProto
-    | 14 => Some COMPLEX64_TensorProto
-    | 15 => Some COMPLEX128_TensorProto
-    | 16 => Some BFLOAT16_TensorProto
-    | 17 => Some FLOAT8E4M3FN_TensorProto
-    | 18 => Some FLOAT8E4M3FNUZ_TensorProto
-    | 19 => Some FLOAT8E5M2_TensorProto
-    | 20 => Some FLOAT8E5M2FNUZ_TensorProto
-    | 21 => Some UINT4_TensorProto
-    | 22 => Some INT4_TensorProto
-    | 23 => Some FLOAT4E2M1_TensorProto
-    | _ => None
-    end%Z
-end.
+Open Scope quotient_scope.
 
 (********************************************)
 (**************** SYNTAX ********************)
@@ -146,39 +97,73 @@ Definition int32_of_DataType_TensorProto (x : DataType_TensorProto) : int32 :=
   | FLOAT4E2M1_TensorProto => (x00, x00, x00, x17)
   end.
 
-Definition value_tensor_type (v : ValueInfoProto) : option int32 :=
+Definition DataType_TensorProto_of_int32 (i : int32) : option DataType_TensorProto :=
+  match Z_of_int32 i with
+  | 0 => Some UNDEFINED_TensorProto
+  | 1 => Some FLOAT_TensorProto
+  | 2 => Some UINT8_TensorProto
+  | 3 => Some INT8_TensorProto
+  | 4 => Some UINT16_TensorProto
+  | 5 => Some INT16_TensorProto
+  | 6 => Some INT32_TensorProto
+  | 7 => Some INT64_TensorProto
+  | 8 => Some STRING_TensorProto
+  | 9 => Some BOOL_TensorProto
+  | 10 => Some FLOAT16_TensorProto
+  | 11 => Some DOUBLE_TensorProto
+  | 12 => Some UINT32_TensorProto
+  | 13 => Some UINT64_TensorProto
+  | 14 => Some COMPLEX64_TensorProto
+  | 15 => Some COMPLEX128_TensorProto
+  | 16 => Some BFLOAT16_TensorProto
+  | 17 => Some FLOAT8E4M3FN_TensorProto
+  | 18 => Some FLOAT8E4M3FNUZ_TensorProto
+  | 19 => Some FLOAT8E5M2_TensorProto
+  | 20 => Some FLOAT8E5M2FNUZ_TensorProto
+  | 21 => Some UINT4_TensorProto
+  | 22 => Some INT4_TensorProto
+  | 23 => Some FLOAT4E2M1_TensorProto
+  | _ => None
+  end%Z.
+
+Definition value_tensor_type (v : ValueInfoProto) : option DataType_TensorProto :=
 match v with
 | ValueInfoProto_constructor _ typeP _ _ =>
     match typeP with
     | Some (TypeProto_constructor (Some (tensor_type_value_TypeProto t)) _) =>
         match t with
-        | Tensor_TypeProto_constructor type _ =>  type
+        | Tensor_TypeProto_constructor type _ =>  obind DataType_TensorProto_of_int32 type
         end
     | _ => None
     end
 end.
 
-Definition tensor_type (d : TensorType Elem) : int32 := (int32_of_DataType_TensorProto (projT1 (tensorTypes Elem d))).
-
+Definition has_value_tensor_type (v : ValueInfoProto) : bool :=
+  match value_tensor_type v with
+  | Some _ => true
+  | _ => false
+  end.
 
 Definition network_dim_match (m : ModelProto) (n : NetworkType Elem) : bool :=
 match n with
 | networkType (exist inps inpsgt0) (exist outs outsgt0) =>
-    [&& (size inps == size (graph_inputs m)),
-          (size outs == size (graph_outputs m)),
-          (subseq (graph_inputs m) (model_values m))
-     & (subseq (graph_outputs m) (model_values m))]
+    [&& (subseq (graph_inputs m) (model_values m)),
+      (subseq (graph_outputs m) (model_values m)),
+      all2 (fun x => eq_op (Some (tag (tensorTypes Elem x)))) inps (map value_tensor_type (graph_inputs m)) (** A predicate that says the shape and types of the NetworkType are respected by the model's outputs **)
+         (** A predicate that says the shape and types of the NetworkType are respected by the model's outputs **)
+      (* all (oapp (mem supported_types) false) (map value_tensor_type (graph_outputs m)) (** A predicate saying that all outputs must exist and have a valid type **) *)
+      & all2 (fun x => eq_op (Some (tag (tensorTypes Elem x)))) outs (map value_tensor_type (graph_outputs m))]
 end.
 
 Definition sized_model (d : NetworkType Elem) : eqType :=
-  { m : ModelProto | network_dim_match m d}.
+  { m : ModelProto | network_dim_match m d && graph_of m}.
 
 Definition nodeOutput (y : NetworkType Elem) (m' : sized_model y) (s : string)
 (d : TensorType Elem) : eqType :=
 match m' with
 | exist m _ =>
     { v : ValueInfoProto | (v \in model_values m) && (value_info_name v == s) &&
-                             (value_tensor_type v == Some (tensor_type d))}
+                             (value_tensor_type v == Some (tag (tensorTypes _ d)))}
 end.
 
 Definition producing_node (m : ModelProto) (u : string) : NodeProto :=
@@ -196,50 +181,53 @@ with the NodeProto that produces it.
 Definition emptyValueInfoProto : ValueInfoProto :=
   ValueInfoProto_constructor None None None nil.
 
-Lemma val_rew_ord n m (E : n = m) (i : 'I_n) :
-  nat_of_ord (rew [ordinal] E in i) = nat_of_ord i.
-Proof. by case: m / E. Qed.
+(** The network type's outputs line up one-to-one with the graph outputs. **)
+Lemma network_dim_match_size {y : NetworkType Elem} {m : ModelProto} :
+  network_dim_match m y -> size (outputs Elem y) = size (graph_outputs m).
+Proof.
+case: y => [[inps Hin] [outs Hout]] /= /and4P [_ _ _].
+by rewrite all2E size_map => /andP [/eqP].
+Qed.
+
+(** The graph output at the same position as the i-th declared output. **)
+Definition mOutput_value {y : NetworkType Elem} {m : ModelProto}
+  (H : network_dim_match m y) (i : 'I_(size (outputs Elem y))) : ValueInfoProto :=
+  tnth (in_tuple (graph_outputs m)) (cast_ord (network_dim_match_size H) i).
+
+Lemma mOutput_valueP {y : NetworkType Elem} {m : ModelProto}
+  (H : network_dim_match m y) (i : 'I_(size (outputs Elem y))) :
+  let v := mOutput_value H i in
+  (v \in model_values m) && (value_info_name v == value_info_name v) &&
+    (value_tensor_type v == Some (projT1 (tensorTypes _ (tnth (in_tuple (outputs Elem y)) i)))).
+Proof.
+rewrite /mOutput_value eqxx andbT.
+move: (network_dim_match_size H) => E; move: i E H.
+case: y => [[inps Hin] [outs Hout]] /= i E /and4P [_ outsub _].
+rewrite all2E size_map => /andP [_ /all_nthP outsame].
+have /(mem_subseq outsub) -> /= :
+  tnth (in_tuple (graph_outputs m)) (cast_ord E i) \in graph_outputs m := mem_tnth _ _.
+set v := tnth (in_tuple (graph_outputs m)) (cast_ord E i).
+set o := tnth (in_tuple outs) i.
+have := outsame (o, value_tensor_type v) i.
+rewrite nth_zip_cond size_zip size_map -[in minn _ _]E minnn ltn_ord /= => /(_ isT) /eqP.
+rewrite (nth_map v) -?E // -[nth o outs i](tnth_nth o (in_tuple outs) i).
+rewrite -[nth v _ i](tnth_nth v (in_tuple (graph_outputs m)) (cast_ord E i)) -/v -/o.
+by move=> ->.
+Qed.
 
 (** For each out in the graphproto.outputs, find the valueInfoProto  **)
-Program Definition mOutputs (y : NetworkType Elem) (m : sized_model y) :
+Definition mOutputs (y : NetworkType Elem) (m : sized_model y) :
   {dffun forall i : 'I_(size (outputs Elem y)),
- {u : string & nodeOutput y m u (tnth (in_tuple (outputs Elem y)) i)}}
-  :=
-  finfun (fun i : 'I_(size (outputs Elem y)) =>
-    let u := tnth (in_tuple (map value_info_name (graph_outputs m))) i in
-    existT _ u _).
-Next Obligation.
-case: y H i => [[inps Hin] [outs Hout]] /and4P [_ /eqP -> _ _] /= i.
-by rewrite size_map.
-Qed.
-Next Obligation.
-case: y i m H => [[inp Hinp] [out Hout]] /= i m H.
-have := H => /and4P [/eqP inpeq /eqP outeq inpsub outsub].
-exists (tnth (in_tuple (graph_outputs m)) (cast_ord outeq i)).
-apply/andP.
-split.
-apply/andP.
-split.
-have H' : tnth (in_tuple (graph_outputs m)) (cast_ord outeq i) \in (graph_outputs m) := mem_tnth _ _.
-exact: (mem_subseq outsub H').
-rewrite !(tnth_nth emptyValueInfoProto) /=.
-rewrite !(tnth_nth "") /=.
-rewrite val_rew_ord.
-rewrite (nth_map emptyValueInfoProto) => //.
-by rewrite -outeq.
-rewrite /value_tensor_type.
-case: (tnth (in_tuple (graph_outputs m)) (cast_ord outeq i)) => name type doc_string meta.
-case: type.
-case.
-case.
-case.
-case.
-case.
-move=> t name'.
-
-
-
-
+ {u : string & nodeOutput y m u (tnth (in_tuple (outputs Elem y)) i)}} :=
+  match m as m0 return
+    {dffun forall i : 'I_(size (outputs Elem y)),
+      {u : string & nodeOutput y m0 u (tnth (in_tuple (outputs Elem y)) i)}}
+  with
+  | exist m0 H =>
+      finfun (fun i : 'I_(size (outputs Elem y)) =>
+        let v := mOutput_value (andP H).1 i in
+        existT _ (value_info_name v) (exist _ v (mOutput_valueP (andP H).1 i)))
+  end.
 
 (** TODO: mOutputs and nodeOutput are wrong. NodeOutput should only be
 constructable if there is a node output and modl output should only contain
@@ -247,11 +235,11 @@ valid model output. Fix Model so that it holds enough information to construct
 this. NodeOutput should be an inductive type that points to constructors **)
 
 (** Ignores renaming and reordering, graph isomorphism problem. **)
-Definition is_iso (y1 y2 : NetworkType Elem) (m1 : ModelProto)
-(H : NetworkShapesMatch y1 y2) (m2 : ModelProto) : bool :=
+Definition is_iso (y1 y2 : NetworkType Elem) (m1 : sized_model y1)
+(H : NetworkShapesMatch y1 y2) (m2 : sized_model y2) : bool :=
 match m1, m2 with
-| ModelProto_constructor _ _ _ _ _ _ _ x _ _ _ _,
-  ModelProto_constructor _ _ _ _ _ _ _ x' _ _ _ _ =>
+| exist (ModelProto_constructor _ _ _ _ _ _ _ x _ _ _ _) _,
+  exist (ModelProto_constructor _ _ _ _ _ _ _ x' _ _ _ _) _ =>
     match x, x' with
     | Some y, Some y' =>
         match y, y' with
@@ -271,8 +259,31 @@ Definition dims_match (p : TensorProto) (d : {k : nat & {posnum nat} ^ k}) : boo
       map int64_to_dim dims == map (fun q : {posnum nat} => q%:num) (tval shape)
   end.
 
+Definition Tensor_has_type (t : TensorProto) (x : DataType_TensorProto) : bool :=
+match t with
+| TensorProto_constructor _ (Some data_type) _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    match (DataType_TensorProto_of_int32 data_type) with
+    | Some y => x == y
+    | _ => false
+    end
+| _ => false
+end.
+
+Definition tensorProtoSized (t : TensorProto) : bool :=
+match t with
+| TensorProto_constructor dims (Some data_type) _ float_data int32_data _ int64_data _
+    _ _ _ _ _ _ _ =>
+    match DataType_TensorProto_of_int32 data_type with
+    | Some FLOAT_TensorProto => size float_data == \prod_(i < size [seq int64_to_dim i | i <- dims]) tnth (in_tuple (map int64_to_dim dims)) i
+    | Some INT32_TensorProto => size int32_data == \prod_(i < size [seq int64_to_dim i | i <- dims]) tnth (in_tuple (map int64_to_dim dims)) i
+    | Some INT64_TensorProto => size int64_data == \prod_(i < size [seq int64_to_dim i | i <- dims]) tnth (in_tuple (map int64_to_dim dims)) i
+    | _ => false
+    end
+| _ => false
+end.
+
 Definition sized_tensor (t : TensorType Elem) : eqType :=
-  { p : TensorProto | dims_match p (tensorDims _ t) }.
+  { p : qTensor | dims_match p (tensorDims _ t) && Tensor_has_type p (tag (tensorTypes _ t)) && tensorProtoSized p}.
 
 Definition syntax_inst : NetworkTheorySyntax :=
   {|
@@ -280,7 +291,7 @@ Definition syntax_inst : NetworkTheorySyntax :=
       TheoryTensor := sized_tensor;
       Model := sized_model;
       NodeOutputName := string;
-      NodeOutput := nodeOutput; (* TODO: nodeOutput; *)
+      NodeOutput := nodeOutput;
       modelOutputs := mOutputs;
       iso := is_iso;
   |}.
@@ -305,34 +316,42 @@ end.
 
 (* TODO: data_type is a reference to the enum DataType_TensorProto, so there
 should be a check these match *)
+Lemma prod_tnth (s : seq nat) :
+  \prod_(i < size s) tnth (in_tuple s) i = \prod_(x <- s) x.
+Proof. by rewrite [RHS]big_tnth. Qed.
 
 Definition theoryTensorProto : forall t : TensorType (ElementType syntax_inst), TheoryTensor syntax_inst t -> TensorSemantics denote t.
 Proof.
+rewrite /TheoryTensor.
 rewrite /=.
 case.
-move=> /= [x H] [k dims] t.
-case: t.
-case.
-move=> /= t_dims data_type segment float int32 string int64 name doc_string raw_data
-           external_data data_location double_data uint64_data metadata_props matches.
-case: x H => //= H.
-(* Each branch builds the tensor as a column vector: TensorSemantics for a
-   purely-contravariant tensor 'nT[R]_(dims) is definitionally a matrix
-   'M[R]_(\prod_i (dims i)%:num, 1) (the covariant-dims product is empty,
-   hence 1 -- that's what `rewrite big_ord0` makes visible), so a flat,
-   row-major TensorProto data list of length \prod_i (dims i)%:num is
-   exactly a column vector of that shape. Nothing here proves the data
-   list actually has that length, so out-of-range positions fall back to
-   an arbitrary default (zero, or the empty string) via `nth`. *)
+case => /= [x H] [k dims] [t /= /andP [/andP [Ht hasType] sized]].
+case: t Ht hasType sized => /= t Ht Ht'.
+rewrite /Tensor_has_type /tensorProtoSized.
+move: Ht'.
+case t.
+move=> /= t_dims.
+case=> //.
+move=> /(DataType_TensorProto_of_int32).
+case=> //= data_type segment float int32 string int64 name doc_string raw_data
+           external_data data_location double_data uint64_data metadata_props /eqP.
+case: x H => // _ dims_eq /eqP <- /eqP data_sized.
+- apply: Tensor. rewrite big_ord0.
+  apply: (\col_(i < \prod_(i < k) (dims i)%:posnum) tnth (in_tuple float) (cast_ord _ i)).
+  move=> _ _.
+  move: data_sized.
+  by rewrite dims_eq prod_tnth big_map big_map big_enum /= => <-.
 - apply: Tensor; rewrite big_ord0.
-  exact: (\col_i nth (Binary.B754_zero 24 128 false) float i).
+  apply: (\col_(i < \prod_(i < k) (dims i)%:posnum) tnth (in_tuple int32) (cast_ord _ i)).
+  move=> _ _.
+  move: data_sized.
+  by rewrite dims_eq prod_tnth big_map big_map big_enum /= => <-.
 - apply: Tensor; rewrite big_ord0.
-  exact: (\col_i nth (Byte.x00, Byte.x00, Byte.x00, Byte.x00) int32 i).
-- apply: Tensor; rewrite big_ord0.
-  exact: (\col_i nth (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00) int64 i).
-Defined. (** TODO: Look at making this not use nth **)
-
-
+  apply: (\col_(i < \prod_(i < k) (dims i)%:posnum) tnth (in_tuple int64) (cast_ord _ i)).
+  move=> _ _.
+  move: data_sized.
+  by rewrite dims_eq prod_tnth big_map big_map big_enum /= => <-.
+Defined.
 
 (* --- Converting between the mathcomp tensor interface and TensorProto ---
    'nT[R]_(dims) is definitionally a column vector 'M[R]_(prod dims, 1)
@@ -343,20 +362,17 @@ Defined. (** TODO: Look at making this not use nth **)
    exports a constructor literally named `enum`, from the ProtobufConverter
    IR type, which takes a string -- hence `fintype.enum` everywhere below. *)
 
-Definition build_tensor {R : eqType} (default : R) {k : nat} (dims : {posnum nat}^k)
-  (data : seq R) : 'nT[R]_(dims).
+Definition build_tensor {R : eqType} {k : nat} (dims : {posnum nat}^k)
+  (data : seq R) (H : size data = \prod_(i < k) (dims i)%:posnum) : 'nT[R]_(dims).
 Proof.
 apply: Tensor; rewrite big_ord0.
-exact: (\col_i nth default data i).
+exact: (\col_i tnth (in_tuple data) (cast_ord (esym H) i)).
 Defined.
 
 Definition read_tensor {R : eqType} {k : nat} (dims : {posnum nat}^k) (t : 'nT[R]_(dims))
   : seq R :=
   let cols_eq : \prod_(j < 0) ([tuple] j)%:posnum = 1%R := big_ord0 _ _ _ _ in
   [seq val t i (cast_ord (esym cols_eq) ord0) | i <- fintype.enum 'I_(\prod_(l < k) (dims l)%:num)].
-
-Definition default_TensorProto : TensorProto :=
-  TensorProto_constructor nil None None nil nil nil nil None None None nil None nil nil nil.
 
 Definition int32_zero : int32 := (Byte.x00, Byte.x00, Byte.x00, Byte.x00).
 Definition int64_zero : int64 :=
@@ -372,26 +388,32 @@ Definition string_to_bytes (s : string) : bytes :=
 
 (* ONNX's numeric DataType codes (1=FLOAT, 6=INT32, 7=INT64, 8=STRING,
    11=DOUBLE, 13=UINT64 -- the ones op_gemm.v/op_relu.v already match on). *)
-Definition Semantics_to_TensorProto (d : TensorType Elem) : TensorSemantics denote d -> TensorProto.
+Definition Semantics_to_TensorProto (d : TensorType Elem)
+  : TensorSemantics denote d -> qTensor.
 Proof.
 case: d => [[x Px] [k dims]] /=.
 case: x Px => //= Px v.
-- exact: (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 1) None
-            (read_tensor dims v) nil nil nil None None None nil None nil nil nil).
-- exact: (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 6) None
+- exact: (\pi_qTensor (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 1) None
+            (read_tensor dims v) nil nil nil None None None nil None nil nil nil)).
+- exact: \pi_qTensor (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 6) None
             nil (read_tensor dims v) nil nil None None None nil None nil nil nil).
-- exact: (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 7) None
+- exact: \pi_qTensor (TensorProto_constructor (dims_of_shape dims) (int32_of_Z 7) None
             nil nil nil (read_tensor dims v) None None None nil None nil nil nil).
 Defined.
 
-Definition TensorProto_to_Semantics (d : TensorType Elem) (t : TensorProto) : TensorSemantics denote d.
+Definition TensorProto_to_Semantics (d : TensorType Elem) (t : sized_tensor d) : TensorSemantics denote d.
 Proof.
-case: d => [[x Px] [k dims]] /=.
-case: t => [_ _ _ float_data int32_data string_data int64_data _ _ _ _ _ double_data uint64_data _].
-case: x Px => //= Px.
-- exact: (build_tensor (Binary.B754_zero 24 128 false : float32) dims float_data).
-- exact: (build_tensor int32_zero dims int32_data).
-- exact: (build_tensor int64_zero dims int64_data).
+case: d t => [/= [x Px] [k dims]] /= [].
+case.
+case=> [t_dims data_type segment float_data int32_data string_data int64_data name doc_string bytes ext loc double_data uint64_data meta] canon.
+rewrite /= => /andP [].
+case: data_type canon => // data_type canon.
+case: (DataType_TensorProto_of_int32 data_type) => // ? /andP [/eqP dims_match /eqP <-].
+case: x Px => //= Px /=;
+rewrite dims_match prod_tnth big_map big_map big_enum /= => /eqP.
+- exact: (build_tensor dims float_data).
+- exact: (build_tensor dims int32_data).
+- exact: (build_tensor dims int64_data).
 Defined.
 
 (* Lemma Semantics_to_TensorProtoK (d : TensorType Elem) : cancel (Semantics_to_TensorProto d) (TensorProto_to_Semantics d). *)
@@ -422,6 +444,11 @@ model has no graph, evaluation errors, or `u` isn't among its declared
 outputs, it falls back to default_TensorProto (the all-zero tensor),
 rather than being partial.
 *)
+
+Definition default_TensorProto : TensorProto :=
+    TensorProto_constructor nil None None nil nil nil nil None None None nil None nil nil nil.
+
+
 (* TODO: Make this so that it extracts model to a maths function over mathcomp tensors and applies it to inputSemantics. Must cascade input through entire graph.
  Map model to a function over mathcomp tensor **)
 Definition modelTensorProto (y : NetworkType (ElementType syntax_inst))
@@ -434,42 +461,15 @@ case: y n out => /= inputs outputs model node /=.
 move=> inp.
 pose user_inputs := [seq Semantics_to_TensorProto (tnth (in_tuple inputs) i) (inp i)
                      | i <- fintype.enum 'I_(size inputs)].
-pose idx := seq.index u (map value_info_name (graph_outputs model)).
-pose out_tp := match onnx_evaluator model user_inputs with
-  | Success outs => nth default_TensorProto outs idx
+pose idx := seq.index u (map value_info_name (graph_outputs (tag model))).
+pose out_tp := match onnx_evaluator (tag model) (map repr user_inputs) with
+  | Success outs => nth default_TensorProto (in_tuple outs) idx
   | Error _ => default_TensorProto
   end.
-exact: (TensorProto_to_Semantics d out_tp).
-Defined.
+Admitted.
+(* exists (TensorProto_to_Semantics d (\pi_qTensor out_tp)). *)
+(* Defined. *)
 
-Definition DataType_TensorProto_of_int32 (i : int32) : option DataType_TensorProto :=
-  match Z_of_int32 i with
-  | 0 => Some UNDEFINED_TensorProto
-  | 1 => Some FLOAT_TensorProto
-  | 2 => Some UINT8_TensorProto
-  | 3 => Some INT8_TensorProto
-  | 4 => Some UINT16_TensorProto
-  | 5 => Some INT16_TensorProto
-  | 6 => Some INT32_TensorProto
-  | 7 => Some INT64_TensorProto
-  | 8 => Some STRING_TensorProto
-  | 9 => Some BOOL_TensorProto
-  | 10 => Some FLOAT16_TensorProto
-  | 11 => Some DOUBLE_TensorProto
-  | 12 => Some UINT32_TensorProto
-  | 13 => Some UINT64_TensorProto
-  | 14 => Some COMPLEX64_TensorProto
-  | 15 => Some COMPLEX128_TensorProto
-  | 16 => Some BFLOAT16_TensorProto
-  | 17 => Some FLOAT8E4M3FN_TensorProto
-  | 18 => Some FLOAT8E4M3FNUZ_TensorProto
-  | 19 => Some FLOAT8E5M2_TensorProto
-  | 20 => Some FLOAT8E5M2FNUZ_TensorProto
-  | 21 => Some UINT4_TensorProto
-  | 22 => Some INT4_TensorProto
-  | 23 => Some FLOAT4E2M1_TensorProto
-  | _ => None
-  end%Z.
 
 (* the two are genuine inverses: encoding then decoding always recovers
    the original constructor *)
@@ -544,18 +544,10 @@ Defined.
 
 Definition TensorProto_neg (d : TensorType (ElementType syntax_inst)) : TensorOp1 denote d.
 Proof.
-case: d => t [k dims] /=.
-rewrite /TensorOp1 /TensorSemantics /= => x.
-exact: (-x).
-
-exact (-t)%R.
-move=> /(Semantics_to_TensorProto d) t.
-have := neg_tensor t.
-case.
-move=> t'.
-exact: (TensorProto_to_Semantics d t').
-move=> _.
-exact: (TensorProto_to_Semantics d (zero_tensor t)).
+case: d => [[[]]] //= type_in [k dims] t.
+exact: (@Tensor _ _ dims _ float32 (map_mx (b32_mult BinarySingleNaN.mode_NE default_minus_one) (\val t))).
+exact: (@Tensor _ _ dims _ int32 (map_mx (fun h1 => mc_inst.int32_of_Z (- (Z_of_int32 h1))) (\val t))).
+exact: (@Tensor _ _ dims _ int64 (map_mx (fun h1 => mc_inst.int64_of_Z (- (Z_of_int64 h1))) (\val t))).
 Defined.
 
 Lemma add_lists_float32_sized {s1 s2 : seq float32}
@@ -596,24 +588,26 @@ Qed.
 
 Definition TensorProto_add (d : TensorType (ElementType syntax_inst)) : TensorOp2 denote d.
 Proof.
-move=> /(Semantics_to_TensorProto d) t1 /(Semantics_to_TensorProto d) t2.
-have := add_tensor t1 t2.
-case => t.
-exact: (TensorProto_to_Semantics d t).
-exact: (TensorProto_to_Semantics d (zero_tensor t1)).
-Qed.
+case: d => [[[]]] //= type_in [k dims] t u.
+exact: (@Tensor _ _ dims _ float32 (map2_mx (b32_plus BinarySingleNaN.mode_NE) (\val t) (\val u))).
+exact: (@Tensor _ _ dims _ int32 (map2_mx (fun h1 h2 => mc_inst.int32_of_Z
+                                                       ((Z_of_int32 h2) + (Z_of_int32 h1))) (\val t) (\val u))).
+exact: (@Tensor _ _ dims _ int64 (map2_mx (fun h1 h2 => mc_inst.int64_of_Z ((Z_of_int64 h1) + (Z_of_int64 h2))) (\val t) (\val u))).
+Defined.
 
 (** TODO: The zero_tensor needs to be reshaped **)
 Definition TensorProto_mul (d : TensorType (ElementType syntax_inst)) : TensorOp2 denote d.
 Proof.
-move=> /(Semantics_to_TensorProto d) t1 /(Semantics_to_TensorProto d) t2.
-have := matmul_tensor t1 t2.
-case => t.
-exact: (TensorProto_to_Semantics d t).
-exact: (TensorProto_to_Semantics d (zero_tensor t1)).
-Qed.
+case: d => [[[]]] //= type_in [k dims] t u.
+exact: (@Tensor _ _ dims _ float32 (map2_mx (b32_mult BinarySingleNaN.mode_NE) (\val t) (\val u))).
+exact: (@Tensor _ _ dims _ int32 (map2_mx (fun h1 h2 => mc_inst.int32_of_Z
+                                                       ((Z_of_int32 h2) * (Z_of_int32 h1))) (\val t) (\val u))).
+exact: (@Tensor _ _ dims _ int64 (map2_mx (fun h1 h2 => mc_inst.int64_of_Z ((Z_of_int64 h1) * (Z_of_int64 h2))) (\val t) (\val u))).
+Defined.
 
 (** TODO: Change to denotational (mathcomp) semantics **)
+(** This now does denotational for the strcture, but still uses the ints and floats
+for the individual operations **)
 Definition semantics_inst : NetworkTheorySemantics syntax_inst :=
   {|
       elementType := denote;
@@ -636,11 +630,13 @@ Definition semantics_inst : NetworkTheorySemantics syntax_inst :=
 
 From Stdlib Require Import Rdefinitions.
 
-Definition idk : (@RealNetworkSemantics R).
+Definition idk : (@RealNetworkSemantics syntax_inst R).
 Proof.
 rewrite /RealNetworkSemantics.
-move=> n y1 y2 d1 d2 u m networkshapesMatch inp out tensorShapesMatch.
-case: d2 tensorShapesMatch => /= tensorTypes [k dims] /= tensorShapesMatch.
-rewrite /TensorSemantics.
-move: m out.
-rewrite /Model.
+move=> y1 y2 d1 d2 u m networkshapesMatch inp out tensorShapesMatch.
+case: m out=> /= m /andP [Hm Hm'] out.
+have := graph_of m.
+case: (graph_of m) Hm' => [g|] // _ _.
+case: g => nodes _ initialisers _ _ inputs outputs _ _ _.
+have vertices := ((map (fun x => node x) (rev nodes)) ++ (map (fun x => input x) inputs)
+                    ++ (map (fun x => tensor x) initialisers))%SEQ.
