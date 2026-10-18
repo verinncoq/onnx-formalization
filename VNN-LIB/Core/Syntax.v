@@ -1,4 +1,4 @@
-From mathcomp Require Import all_boot all_algebra all_order.
+From mathcomp Require Import boot algebra order.
 From mathcomp Require Import interval_inference tensor.
 From HB Require Import structures.
 From Stdlib Require Import Strings.String.
@@ -52,6 +52,7 @@ Record HiddenDeclaration : Type :=
       hiddenType : TensorType (ElementType n);
       nodeOutputName : NodeOutputName n
     }.
+    
 Definition HiddenDeclarationEq : rel HiddenDeclaration :=
   fun d1 d2 =>
     match d1, d2 with
