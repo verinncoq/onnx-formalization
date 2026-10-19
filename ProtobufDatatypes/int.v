@@ -74,59 +74,46 @@ Open Scope byte_scope.
 
 (*
 Converts a Z into a unsigned integer with 32 bits.
-If the input is out of the bounds, None is returned.
+If the input is out of the bounds, it overflows, i.e. it is taken modulo 2^32.
 *)
-Definition uint32_of_Z (z: Z) : option uint32 :=
-  match in_range z 0 uint32_max with
-  | true =>
-    let z_0 := z mod 256 in
-    let z_1 := (z/256) mod 256 in
-    let z_2 := (z/(256*256)) mod 256 in
-    let z_3 := (z/(256*256*256)) mod 256 in
-    match (N_of_Z z_0), (N_of_Z z_1), (N_of_Z z_2), (N_of_Z z_3) with
-    | Some n_0, Some n_1, Some n_2, Some n_3 =>
-      match (of_N n_0), (of_N n_1), (of_N n_2), (of_N n_3) with
-      | Some b0, Some b1, Some b2, Some b3 => Some (b3, b2, b1, b0)
-      | _, _, _, _ => None
-      end
-    | _, _, _, _ => None
-    end
-  | false => None
-  end.
+Definition uint32_of_Z (z: Z) : uint32 :=
+  let byte_of (z' : Z) : byte :=
+    match of_N (Z.to_N (z' mod 256)) with
+    | Some b => b
+    | None => x00
+    end in
+  let b0 := byte_of z in
+  let b1 := byte_of (z/256) in
+  let b2 := byte_of (z/(256*256)) in
+  let b3 := byte_of (z/(256*256*256)) in
+  (b3, b2, b1, b0).
 
 (*
 Converts a Z into a unsigned integer with 64 bits.
-If the input is out of the bounds, None is returned.
+If the input is out of the bounds, it overflows, i.e. it is taken modulo 2^64.
 *)
-Definition uint64_of_Z (z: Z) : option uint64 :=
-  match in_range z 0 uint64_max with
-  | true =>
-    let z_0 := z mod 256 in
-    let z_1 := (z/256) mod 256 in
-    let z_2 := (z/(256*256)) mod 256 in
-    let z_3 := (z/(256*256*256)) mod 256 in
-    let z_4 := (z/(256*256*256*256)) mod 256 in
-    let z_5 := (z/(256*256*256*256*256)) mod 256 in
-    let z_6 := (z/(256*256*256*256*256*256)) mod 256 in
-    let z_7 := (z/(256*256*256*256*256*256*256)) mod 256 in
-    match (N_of_Z z_0), (N_of_Z z_1), (N_of_Z z_2), (N_of_Z z_3), (N_of_Z z_4), (N_of_Z z_5), (N_of_Z z_6), (N_of_Z z_7) with
-    | Some n_0, Some n_1, Some n_2, Some n_3, Some n_4, Some n_5, Some n_6, Some n_7 =>
-      match (of_N n_0), (of_N n_1), (of_N n_2), (of_N n_3), (of_N n_4), (of_N n_5), (of_N n_6), (of_N n_7) with
-      | Some b0, Some b1, Some b2, Some b3, Some b4, Some b5, Some b6, Some b7 => Some (b7, b6, b5, b4, b3, b2, b1, b0)
-      | _, _, _, _, _, _, _, _ => None
-      end
-    | _, _, _, _, _, _, _, _ => None
-    end
-  | false => None
-  end.
+Definition uint64_of_Z (z: Z) : uint64 :=
+  let byte_of (z' : Z) : byte :=
+    match of_N (Z.to_N (z' mod 256)) with
+    | Some b => b
+    | None => x00
+    end in
+  let b0 := byte_of z in
+  let b1 := byte_of (z/256) in
+  let b2 := byte_of (z/(256*256)) in
+  let b3 := byte_of (z/(256*256*256)) in
+  let b4 := byte_of (z/(256*256*256*256)) in
+  let b5 := byte_of (z/(256*256*256*256*256)) in
+  let b6 := byte_of (z/(256*256*256*256*256*256)) in
+  let b7 := byte_of (z/(256*256*256*256*256*256*256)) in
+  (b7, b6, b5, b4, b3, b2, b1, b0).
 
 (*
 Converts a Z into a signed integer with 32 bits.
-If the input is out of the bounds, None is returned.
-If the input is positive, convertion happens with the function for the unsigned version
-(because the input is inside the bounds, the first bit will never be set for a positive input).
-If the input is negative, its absolute value gets substracted from the maximum for unsigend integers + 1.
-Then, again, convertion happens with the function for the unsigned version.
+If the input is out of the bounds, it overflows (wraps around) like a
+two's complement integer.
+Since uint32_of_Z takes its input modulo 2^32 and Z.modulo by a positive
+number is never negative, a negative z is converted to (uint32_max + 1) + z.
 Example: z = -1, the value (uint32_max + 1) - 1 = uint32_max gets converted,
 which is every bit 1 (11111111 11111111 11111111 11111111).
 This is the two's complement representation for -1.
@@ -134,25 +121,13 @@ Example: z = -2, the value (uint32_max + 1) - 2 = uint32_max - 1 gets converted,
 which is every bit 1 except for the last one (11111111 11111111 11111111 11111110).
 This is the two's complement representation for -2.
 *)
-Definition int32_of_Z (z: Z) : option int32 :=
-  match in_range z int32_min int32_max with
-  | true =>
-    match z with
-    | Zneg p => uint32_of_Z ((uint32_max + 1) - (Zpos p))
-    | _ => uint32_of_Z z
-    end
-  | false => None
-  end.
+Definition int32_of_Z (z: Z) : int32 := uint32_of_Z z.
 
 (*
 Converts a Z into a signed integer with 64 bits.
 It works exaclty as int32_of_Z defined and documented above.
 *)
-Definition int64_of_Z (z: Z) : option int64 :=
-  match z with
-  | Zneg p => uint64_of_Z ((uint64_max + 1) - (Zpos p))
-  | _ => uint64_of_Z z
-  end.
+Definition int64_of_Z (z: Z) : int64 := uint64_of_Z z.
 
 
 
@@ -228,7 +203,7 @@ then the result is converted into an uint32 with the function defined above.
 *)
 Definition uint32_of_string (s: list ascii) : option uint32 :=
   match Z_of_string s with
-  | Some z => uint32_of_Z z
+  | Some z => Some (uint32_of_Z z)
   | None => None
   end.
 
@@ -239,7 +214,7 @@ then the result is converted into an uint64 with the function defined above.
 *)
 Definition uint64_of_string (s: list ascii) : option uint64 :=
   match Z_of_string s with
-  | Some z => uint64_of_Z z
+  | Some z => Some (uint64_of_Z z)
   | None => None
   end.
 
@@ -250,7 +225,7 @@ then the result is converted into an int32 with the function defined above.
 *)
 Definition int32_of_string (s: list ascii) : option int32 :=
   match Z_of_string s with
-  | Some z => int32_of_Z z
+  | Some z => Some (int32_of_Z z)
   | None => None
   end.
 
@@ -261,7 +236,7 @@ then the result is converted into an int64 with the function defined above.
 *)
 Definition int64_of_string (s: list ascii) : option int64 :=
   match Z_of_string s with
-  | Some z => int64_of_Z z
+  | Some z => Some (int64_of_Z z)
   | None => None
   end.
 

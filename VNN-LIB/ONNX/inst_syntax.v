@@ -155,6 +155,9 @@ match n with
       & all2 (fun x => eq_op (Some (tag (tensorTypes Elem x)))) outs (map value_tensor_type (graph_outputs m))]
 end.
 
+Definition model_well_formed (m : ModelProto) : bool :=
+  (graph_of m).
+
 Definition sized_model (d : NetworkType Elem) : eqType :=
   { m : ModelProto | network_dim_match m d && graph_of m}.
 
@@ -177,6 +180,7 @@ looks up the model's actual list of graph outputs (ModelProto -> GraphProto
 -> list ValueInfoProto) at that same position, and pairs that output's name
 with the NodeProto that produces it.
 *)
+int32_of_Z
 
 Definition emptyValueInfoProto : ValueInfoProto :=
   ValueInfoProto_constructor None None None nil.

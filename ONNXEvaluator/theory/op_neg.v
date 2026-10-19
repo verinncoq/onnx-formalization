@@ -16,27 +16,15 @@ Definition neg_tensor (A : TensorProto) : error_option TensorProto :=
     | Some data_type_A =>
       match (Z_of_int32 data_type_A) with
       | 1 => (*float32*)
-          Success (TensorProto_constructor dims_A (int32_of_Z 1%Z) None (scale_list_float32 float32_A default_minus_one) [] [] [] None None None [] None [] [] [])
+          Success (TensorProto_constructor dims_A (Some (int32_of_Z 1%Z)) None (scale_list_float32 float32_A default_minus_one) [] [] [] None None None [] None [] [] [])
       | 6 => (*int32*)
-          match int32_of_Z (-1)%Z with
-          | Some i =>
-              match scale_list_int32 int32_A i with
-              | Success x =>
-                  Success (TensorProto_constructor dims_A (int32_of_Z 6%Z) None [] x [] [] None None None [] None [] [] [])
-              | Error e => Error e
-              end
-          | _ => Error "Neg: Scaling by -1 caused an overflow"
-          end
+          let i := int32_of_Z (-1)%Z in
+              let x := scale_list_int32 int32_A i in
+                  Success (TensorProto_constructor dims_A (Some (int32_of_Z 6%Z)) None [] x [] [] None None None [] None [] [] [])
       | 7 => (*int64*)
-          match int64_of_Z (-1)%Z with
-          | Some i =>
-              match scale_list_int64 int64_A i with
-              | Success x =>
-                  Success (TensorProto_constructor dims_A (int32_of_Z 7%Z) None [] [] [] x None None None [] None [] [] [])
-              | Error e => Error e
-              end
-          | _ => Error "Neg: Scaling by -1 caused an overflow"
-          end
+          let i := int64_of_Z (-1)%Z in
+              let x := scale_list_int64 int64_A i in
+                  Success (TensorProto_constructor dims_A (Some (int32_of_Z 7%Z)) None [] [] [] x None None None [] None [] [] [])
       | _ => Error "Neg: all tensors must have the same datatype, which must be FLOAT, INT32 or INT64"
       end
     | _ => Error "Neg: all data_type fields must be given"

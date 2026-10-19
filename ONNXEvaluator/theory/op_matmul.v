@@ -49,7 +49,7 @@ Definition matmul_tensor (A B: TensorProto) : error_option TensorProto :=
         match matrix_float32_of_tensor A, matrix_float32_of_tensor B with
         | Success matrix_A, Success matrix_B =>
           match matmul_float32 matrix_A matrix_B with
-          | Success result => tensor_of_matrix_float32 result
+          | Success result => Success (tensor_of_matrix_float32 result)
           | Error e => Error e
           end
         | _, _ => Error "Error in converting a Tensor into a Matrix (maybe empty data list, or non-fitting dim list?)"
@@ -59,7 +59,7 @@ Definition matmul_tensor (A B: TensorProto) : error_option TensorProto :=
         match matrix_int32_of_tensor A, matrix_int32_of_tensor B with
         | Success matrix_A, Success matrix_B =>
           match matmul_int32 matrix_A matrix_B with
-          | Success result => tensor_of_matrix_int32 result
+          | Success result => Success (tensor_of_matrix_int32 result)
           | Error e => Error e
           end
         | _, _ => Error "Error in converting a Tensor into a Matrix (maybe empty data list, or non-fitting dim list?)"
@@ -69,7 +69,7 @@ Definition matmul_tensor (A B: TensorProto) : error_option TensorProto :=
         match matrix_int64_of_tensor A, matrix_int64_of_tensor B with
         | Success matrix_A, Success matrix_B =>
           match matmul_int64 matrix_A matrix_B with
-          | Success result => tensor_of_matrix_int64 result
+          | Success result => Success (tensor_of_matrix_int64 result)
           | Error e => Error e
           end
         | _, _ => Error "Error in converting a Tensor into a Matrix (maybe empty data list, or non-fitting dim list?)"

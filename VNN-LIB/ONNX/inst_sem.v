@@ -242,29 +242,6 @@ Definition TensorProto_neq (d : TensorType (ElementType syntax_inst)) : TensorCo
   fun t1 t2 =>
   negb (TensorProto_eq d t1 t2).
 
-Definition zero_tensor (t : TensorProto) : TensorProto.
-case: t => dims data_type segment float_data int32_data string_data int64_data name doc_string raw ext data_loc double_data uint64_data metadata.
-apply/TensorProto_constructor.
-exact: dims.
-exact: data_type.
-exact: segment.
-exact: (map (fun _ => Binary.B754_zero 24 128 false) float_data).
-exact: (map (fun _ => (x00, x00, x00, x00)) int32_data).
-exact: (map (fun xs => map (fun _ => x00) xs) string_data).
-exact: (map (fun _ => (x00, x00, x00, x00, x00, x00, x00, x00)) int32_data).
-exact: name.
-exact: doc_string.
-case: raw => [b|].
-apply/Some.
-exact: (map (fun _ => x00) b).
-exact: None.
-exact: ext.
-exact: data_loc.
-exact: (map (fun _ => Binary.B754_zero 53 1024 false) double_data).
-exact: (map (fun _ => (x00, x00, x00, x00, x00, x00, x00, x00)) uint64_data).
-exact:metadata.
-Defined.
-
 Definition TensorProto_neg (d : TensorType (ElementType syntax_inst)) : TensorOp1 denote d.
 Proof.
 case: d => [[[]]] //= type_in [k dims] t.

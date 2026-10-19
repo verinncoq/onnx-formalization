@@ -31,25 +31,6 @@ edges are the semantic tensors themselves, each paired with its tensor type:
 Gemm and Relu are computed directly on these with mathcomp operations.
 *)
 
-Section Testing.
-Context {r : realType}.
-
-Definition test : (@RealNetworkSemantics syntax_inst r).
-Proof.
-  rewrite /RealNetworkSemantics /=.
-  move=> u1 u2 d1 d2 nodeOutputName model networkShapesMatch inp nodeOutput tensorShapesMatch.
-  case: d2 tensorShapesMatch => tensorTypes2 [k2 dims2] tensorShapesMatch.
-  rewrite /TensorSemantics /=.
-  (* move: nodeOutput. *)
-  case: model nodeOutput.
-  case.
-  move=> /= ? ? ? ? ? ? ? graph ? ? ? ? /andP [networkDimsMatch g].
-  case: graph networkDimsMatch g => //= graph networkDimsMatch _.
-  GraphProto
-
-
-End Testing.
-
 Section RealEvaluator.
 Context (r : realType).
 

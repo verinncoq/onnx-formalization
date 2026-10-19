@@ -47,21 +47,17 @@ Definition gemm_int32 (A B C: matrix int32) (alpha beta: int32) (transA transB: 
   | 0 => B
   | _ => transpose B
   end in
-  match scale_matrix_int32 A' alpha with                                      (*scale A' with alpha*)
-  | Success alpha_A' => match matrix_multiplication_int32 alpha_A' B' with    (*multiply scaled A' with B'*)
+  let alpha_A' := scale_matrix_int32 A' alpha in                                       (*scale A' with alpha*)
+  match matrix_multiplication_int32 alpha_A' B' with    (*multiply scaled A' with B'*)
     | Success alpha_A'_B' =>
       let shape_ab := shape alpha_A'_B' in
       match broadcast_2d (fst shape_ab) (snd shape_ab) dims_c C with            (*broadcast C to shape of ((scaled A') * B')*)
-      | Success C_b => match scale_matrix_int32 C_b beta with                   (*scale C with beta*)
-        | Success scaled_C_b => matrix_addition_int32 alpha_A'_B' scaled_C_b    (*sum ((scaled A') * B') with scaled C*)
-        | Error e => Error e
-        end
+      | Success C_b => let scaled_C_b := scale_matrix_int32 C_b beta in                    (*scale C with beta*)
+        matrix_addition_int32 alpha_A'_B' scaled_C_b    (*sum ((scaled A') * B') with scaled C*)
       | Error e => Error e
       end
     | Error e => Error e
-    end
-  | Error e => Error e
-  end.
+    end.
 
 (*
 General Matrix Multiplication on int64 matrices as defined by ONNX.
@@ -76,19 +72,15 @@ Definition gemm_int64 (A B C: matrix int64) (alpha beta: int64) (transA transB: 
   | 0 => B
   | _ => transpose B
   end in
-  match scale_matrix_int64 A' alpha with                                      (*scale A' with alpha*)
-  | Success alpha_A' => match matrix_multiplication_int64 alpha_A' B' with    (*multiply scaled A' with B'*)
+  let alpha_A' := scale_matrix_int64 A' alpha in                                        (*scale A' with alpha*)
+  match matrix_multiplication_int64 alpha_A' B' with    (*multiply scaled A' with B'*)
     | Success alpha_A'_B' =>
       let shape_ab := shape alpha_A'_B' in
       match broadcast_2d (fst shape_ab) (snd shape_ab) dims_c C with            (*broadcast C to shape of ((scaled A') * B')*)
-      | Success C_b => match scale_matrix_int64 C_b beta with                   (*scale C with beta*)
-        | Success scaled_C_b => matrix_addition_int64 alpha_A'_B' scaled_C_b    (*sum ((scaled A') * B') with scaled C*)
-        | Error e => Error e
-        end
+      | Success C_b => let scaled_C_b := scale_matrix_int64 C_b beta in                  (*scale C with beta*)
+        matrix_addition_int64 alpha_A'_B' scaled_C_b    (*sum ((scaled A') * B') with scaled C*)
       | Error e => Error e
       end
-    | Error e => Error e
-    end
   | Error e => Error e
   end.
 
@@ -191,52 +183,37 @@ Definition matrix_int64_of_tensor (t: TensorProto) : error_option (matrix int64)
 Converts a matrix which uses the float32 datatype into a TensorProto.
 The values are put into the float32 list.
 *)
-Definition tensor_of_matrix_float32 (m: matrix float32) : error_option TensorProto :=
+Definition tensor_of_matrix_float32 (m: matrix float32) : TensorProto :=
   let dims_tuple := (shape m) in
-  match int64_of_Z (Z.of_nat (fst dims_tuple)) with
-  | Some dim_1 => match int64_of_Z (Z.of_nat (snd dims_tuple)) with
-    | Some dim_2 =>
+  let dim_1 := int64_of_Z (Z.of_nat (fst dims_tuple)) in
+  let dim_2 := int64_of_Z (Z.of_nat (snd dims_tuple)) in
       let dims := [dim_1; dim_2] in
       let float_data := convert_to_row_major m in
-      Success (TensorProto_constructor dims (int32_of_Z 1%Z) None float_data [] [] [] None None None [] None [] [] [])
-    | None => Error "Matrix dimension not convertable to int64 (maybe to big?)"
-    end
-  | None => Error "Matrix dimension not convertable to int64 (maybe to big?)"
-  end.
+      TensorProto_constructor dims (Some (int32_of_Z 1%Z)) None float_data [] [] [] None None None [] None [] [] [].
 
 (*
 Converts a matrix which uses the int32 datatype into a TensorProto.
 The values are put into the int32 list.
 *)
-Definition tensor_of_matrix_int32 (m: matrix int32) : error_option TensorProto :=
+Definition tensor_of_matrix_int32 (m: matrix int32) : TensorProto :=
   let dims_tuple := (shape m) in
-  match int64_of_Z (Z.of_nat (fst dims_tuple)) with
-  | Some dim_1 => match int64_of_Z (Z.of_nat (snd dims_tuple)) with
-    | Some dim_2 =>
+  let dim_1 := int64_of_Z (Z.of_nat (fst dims_tuple)) in
+  let dim_2 := int64_of_Z (Z.of_nat (snd dims_tuple)) in
       let dims := [dim_1; dim_2] in
       let int_data := convert_to_row_major m in
-      Success (TensorProto_constructor dims (int32_of_Z 6%Z) None [] int_data [] [] None None None [] None [] [] [])
-    | None => Error "Matrix dimension not convertable to int64 (maybe to big?)"
-    end
-  | None => Error "Matrix dimension not convertable to int64 (maybe to big?)"
-  end.
+      TensorProto_constructor dims (Some (int32_of_Z 6%Z)) None [] int_data [] [] None None None [] None [] [] [].
 
 (*
 Converts a matrix which uses the int64 datatype into a TensorProto.
 The values are put into the int64 list.
 *)
-Definition tensor_of_matrix_int64 (m: matrix int64) : error_option TensorProto :=
+Definition tensor_of_matrix_int64 (m: matrix int64) : TensorProto :=
   let dims_tuple := (shape m) in
-  match int64_of_Z (Z.of_nat (fst dims_tuple)) with
-  | Some dim_1 => match int64_of_Z (Z.of_nat (snd dims_tuple)) with
-    | Some dim_2 =>
+  let dim_1 := int64_of_Z (Z.of_nat (fst dims_tuple)) in
+  let dim_2 := int64_of_Z (Z.of_nat (snd dims_tuple)) in
       let dims := [dim_1; dim_2] in
       let int_data := convert_to_row_major m in
-      Success (TensorProto_constructor dims (int32_of_Z 7%Z) None [] [] [] int_data None None None [] None [] [] [])
-    | None => Error "Matrix dimension not convertable to int64 (maybe to big?)"
-    end
-  | None => Error "Matrix dimension not convertable to int64 (maybe to big?)"
-  end.
+      TensorProto_constructor dims (Some (int32_of_Z 7%Z)) None [] [] [] int_data None None None [] None [] [] [].
 
 
 (*GEMM*)
@@ -287,7 +264,7 @@ Definition gemm (A B C: TensorProto) (a: list AttributeProto) : error_option Ten
           match convert_dims dims_C with
           | Success (dim_C_height, dim_C_width) => 
             match gemm_float32 matrix_A matrix_B matrix_C alpha beta transA transB [dim_C_height; dim_C_width] with
-            | Success result => tensor_of_matrix_float32 result
+            | Success result => Success (tensor_of_matrix_float32 result)
             | Error e => Error e
             end
           | Error e => Error e
@@ -302,14 +279,12 @@ Definition gemm (A B C: TensorProto) (a: list AttributeProto) : error_option Ten
           | Success (dim_C_height, dim_C_width) => 
             match Z_of_float32 alpha, Z_of_float32 beta with
             | Some alpha_z, Some beta_z =>
-              match int32_of_Z alpha_z, int32_of_Z beta_z with
-              | Some alpha', Some beta' =>
+              let alpha' := int32_of_Z alpha_z in
+              let beta' := int32_of_Z beta_z in
                 match gemm_int32 matrix_A matrix_B matrix_C alpha' beta' transA transB [dim_C_height; dim_C_width] with
-                | Success result => tensor_of_matrix_int32 result
+                | Success result => Success (tensor_of_matrix_int32 result)
                 | Error e => Error e
                 end
-              | _, _ => Error "Could not convert alpha or beta to int, which is necessary when operating on int datatypes"
-              end
             | _, _ => Error "Could not convert alpha or beta to int, which is necessary when operating on int datatypes"
             end
           | Error e => Error e
@@ -324,14 +299,12 @@ Definition gemm (A B C: TensorProto) (a: list AttributeProto) : error_option Ten
           | Success (dim_C_height, dim_C_width) => 
             match Z_of_float32 alpha, Z_of_float32 beta with
             | Some alpha_z, Some beta_z =>
-              match int64_of_Z alpha_z, int64_of_Z beta_z with
-              | Some alpha', Some beta' =>
+              let alpha' := int64_of_Z alpha_z in
+              let beta' := int64_of_Z beta_z in
                 match gemm_int64 matrix_A matrix_B matrix_C alpha' beta' transA transB [dim_C_height; dim_C_width] with
-                | Success result => tensor_of_matrix_int64 result
+                | Success result => Success (tensor_of_matrix_int64 result)
                 | Error e => Error e
                 end
-              | _, _ => Error "Could not convert alpha or beta to int, which is necessary when operating on int datatypes"
-              end
             | _, _ => Error "Could not convert alpha or beta to int, which is necessary when operating on int datatypes"
             end
           | Error e => Error e
@@ -367,7 +340,7 @@ Definition gemm_two_inputs (A B: TensorProto) (a: list AttributeProto) : error_o
         | Success matrix_A, Success matrix_B =>
           let zero := Binary.binary_normalize 24 128 eq_refl eq_refl mode_NE 0 0 false in
           match gemm_float32 matrix_A matrix_B [[zero]] alpha beta transA transB [] with
-          | Success result => tensor_of_matrix_float32 result
+          | Success result => Success (tensor_of_matrix_float32 result)
           | Error e => Error e
           end
         | _, _ => Error "Error in converting a Tensor into a Matrix (maybe empty data list, or non-fitting dim list?)"
@@ -378,15 +351,13 @@ Definition gemm_two_inputs (A B: TensorProto) (a: list AttributeProto) : error_o
         | Success matrix_A, Success matrix_B =>
           match Z_of_float32 alpha, Z_of_float32 beta with
           | Some alpha_z, Some beta_z =>
-            match int32_of_Z alpha_z, int32_of_Z beta_z with
-            | Some alpha', Some beta' =>
+            let alpha' := int32_of_Z alpha_z in
+            let beta' := int32_of_Z beta_z in
               let zero := (Byte.x00, Byte.x00, Byte.x00, Byte.x00) in
               match gemm_int32 matrix_A matrix_B [[zero]] alpha' beta' transA transB [] with
-              | Success result => tensor_of_matrix_int32 result
+              | Success result => Success (tensor_of_matrix_int32 result)
               | Error e => Error e
               end
-            | _, _ => Error "Could not convert alpha or beta to int, which is necessary when operating on int datatypes"
-            end
           | _, _ => Error "Could not convert alpha or beta to int, which is necessary when operating on int datatypes"
           end
         | _, _ => Error "Error in converting a Tensor into a Matrix (maybe empty data list, or non-fitting dim list?)"
@@ -397,15 +368,13 @@ Definition gemm_two_inputs (A B: TensorProto) (a: list AttributeProto) : error_o
         | Success matrix_A, Success matrix_B =>
           match Z_of_float32 alpha, Z_of_float32 beta with
           | Some alpha_z, Some beta_z =>
-            match int64_of_Z alpha_z, int64_of_Z beta_z with
-            | Some alpha', Some beta' =>
+            let alpha' := int64_of_Z alpha_z in
+            let beta' := int64_of_Z beta_z in
               let zero := (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00) in
               match gemm_int64 matrix_A matrix_B [[zero]] alpha' beta' transA transB [] with
-              | Success result => tensor_of_matrix_int64 result
+              | Success result => Success (tensor_of_matrix_int64 result)
               | Error e => Error e
               end
-            | _, _ => Error "Could not convert alpha or beta to int, which is necessary when operating on int datatypes"
-            end
           | _, _ => Error "Could not convert alpha or beta to int, which is necessary when operating on int datatypes"
           end
         | _, _ => Error "Error in converting a Tensor into a Matrix (maybe empty data list, or non-fitting dim list?)"

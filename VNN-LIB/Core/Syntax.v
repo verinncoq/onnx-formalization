@@ -417,7 +417,7 @@ Definition ModelsEqual {name : Name} {d1 d2 : NetworkDeclaration}
   (current : NetworkImplementation d1)
   (pair : NetworkImplementation d2 * ValidEqualToTarget name d1 d2)
   : bool :=
-  Syntax.equal n (model d1 current) (targetTypesMatch _ _ _ pair.2) (model d2 pair.1).
+  Syntax.equal (model d1 current) (targetTypesMatch _ _ _ pair.2) (model d2 pair.1).
 
 Definition ModelsIsomorphic {name : Name} {d1 d2 : NetworkDeclaration}
   (current : NetworkImplementation d1)

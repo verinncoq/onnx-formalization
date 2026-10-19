@@ -321,10 +321,7 @@ Fixpoint list_product_int32 (a b : list int32) : error_option int32 :=
     match list_product_int32 xs ys with
     | Success recursive =>
       let result := Z_x * Z_y + (Z_of_int32 recursive) in
-      match int32_of_Z result with
-      | Some f => Success f
-      | None => Error "Dot product between two int32 yields to infinity or NaN"
-      end
+      Success (int32_of_Z result)
     | Error e => Error e
     end
   | [], [] => Success (Byte.x00, Byte.x00, Byte.x00, Byte.x00)
@@ -362,10 +359,9 @@ Fixpoint add_lists_int32 (a b: list int32) : error_option (list int32) :=
   match a, b with
   | [], [] => Success []
   | h1::t1, h2::t2 => match add_lists_int32 t1 t2 with
-    | Success recursive => match int32_of_Z ((Z_of_int32 h1) + (Z_of_int32 h2)) with
-      | Some new => Success (new::recursive)
-      | None => Error "Addition between two int32 yields to infinity or NaN"
-      end
+    | Success recursive =>
+      let new := int32_of_Z ((Z_of_int32 h1) + (Z_of_int32 h2)) in
+      Success (new::recursive)
     | Error e => Error e
     end
   | _, _ => Error "Add lists: lists must have the same length"
@@ -385,26 +381,16 @@ Fixpoint matrix_addition_int32 (a b : matrix int32) : error_option (matrix int32
   | _, _ => Error "Matrix addition: matrices must have the same shape"
   end.
 
-Definition scale_list_int32 (a : list int32) (s : int32) : error_option (list int32) :=
+Definition scale_list_int32 (a : list int32) (s : int32) : list int32 :=
   let z_list := map Z_of_int32 a in
   let scaled_z_list := map (Z.mul (Z_of_int32 s)) z_list in
-  let result_option := map int32_of_Z scaled_z_list in
-  match option_list_of_list_option result_option with
-  | Some result => Success result
-  | None => Error "List scaling results in overflow"
-  end.
+  map int32_of_Z scaled_z_list.
 
 (*scales the matrix by a factor s*)
-Definition scale_matrix_int32 (a: matrix int32) (s: int32) : error_option (matrix int32) :=
+Definition scale_matrix_int32 (a: matrix int32) (s: int32) : matrix int32 :=
   let z_matrix := map (map Z_of_int32) a in
   let scaled_z_matrix := map (map (Z.mul (Z_of_int32 s))) z_matrix in
-  let result_option := map (map int32_of_Z) scaled_z_matrix in
-  match option_list_of_list_option 
-    (map option_list_of_list_option result_option)
-  with  
-  | Some result => Success result
-  | None => Error "Matrix scaling results in overflow"
-  end.
+  map (map int32_of_Z) scaled_z_matrix.
 
 (*converts the whole matrix into a readable string*)
 Definition string_matrix_of_matrix_int32 (m: matrix int32) : matrix string :=
@@ -457,10 +443,7 @@ Fixpoint list_product_int64 (a b : list int64) : error_option int64 :=
     match list_product_int64 xs ys with
     | Success recursive =>
       let result := Z_x * Z_y + (Z_of_int64 recursive) in
-      match int64_of_Z result with
-      | Some f => Success f
-      | None => Error "Dot product between two int64 yields to infinity or NaN"
-      end
+      Success (int64_of_Z result)
     | Error e => Error e
     end
   | [], [] => Success (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00)
@@ -499,10 +482,9 @@ Fixpoint add_lists_int64 (a b: list int64) : error_option (list int64) :=
   match a, b with
   | [], [] => Success []
   | h1::t1, h2::t2 => match add_lists_int64 t1 t2 with
-    | Success recursive => match int64_of_Z ((Z_of_int64 h1) + (Z_of_int64 h2)) with
-      | Some new => Success (new::recursive)
-      | None => Error "Addition between two int64 yields to infinity or NaN"
-      end
+    | Success recursive =>
+      let new := int64_of_Z ((Z_of_int64 h1) + (Z_of_int64 h2)) in
+      Success (new::recursive)
     | Error e => Error e
     end
   | _, _ => Error "Add lists: lists must have the same length"
@@ -522,26 +504,16 @@ Fixpoint matrix_addition_int64 (a b : matrix int64) : error_option (matrix int64
   | _, _ => Error "Matrix addition: matrices must have the same shape"
   end.
 
-Definition scale_list_int64 (a : list int64) (s : int64) : error_option (list int64) :=
+Definition scale_list_int64 (a : list int64) (s : int64) : list int64 :=
   let z_list := map Z_of_int64 a in
   let scaled_z_list := map (Z.mul (Z_of_int64 s)) z_list in
-  let result_option := map int64_of_Z scaled_z_list in
-  match option_list_of_list_option result_option with
-  | Some result => Success result
-  | None => Error "List scaling results in overflow"
-  end.
+  map int64_of_Z scaled_z_list.
 
 (*scales the matrix by a factor s*)
-Definition scale_matrix_int64 (a: matrix int64) (s: int64) : error_option (matrix int64) :=
+Definition scale_matrix_int64 (a: matrix int64) (s: int64) : matrix int64 :=
   let z_matrix := map (map Z_of_int64) a in
   let scaled_z_matrix := map (map (Z.mul (Z_of_int64 s))) z_matrix in
-  let result_option := map (map int64_of_Z) scaled_z_matrix in
-  match option_list_of_list_option 
-    (map option_list_of_list_option result_option)
-  with  
-  | Some result => Success result
-  | None => Error "Matrix scaling results in overflow"
-  end.
+  map (map int64_of_Z) scaled_z_matrix.
 
 (*converts the whole matrix into a readable string*)
 Definition string_matrix_of_matrix_int64 (m: matrix int64) : matrix string :=

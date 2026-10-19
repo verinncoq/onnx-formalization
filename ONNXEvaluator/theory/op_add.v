@@ -18,19 +18,19 @@ Definition add_tensor (A B : TensorProto) : error_option TensorProto :=
       | 1, 1 => (*float32*)
           match add_lists_float32 float32_A float32_B with
           | Success x =>
-          Success (TensorProto_constructor dims_A (int32_of_Z 1%Z) None x [] [] [] None None None [] None [] [] [])
+          Success (TensorProto_constructor dims_A (Some (int32_of_Z 1%Z)) None x [] [] [] None None None [] None [] [] [])
           | Error e => Error e
           end
       | 6, 6 => (*int32*)
           match add_lists_int32 int32_A int32_B with
           | Success x =>
-              Success (TensorProto_constructor dims_A (int32_of_Z 6%Z) None [] x [] [] None None None [] None [] [] [])
+              Success (TensorProto_constructor dims_A (Some (int32_of_Z 6%Z)) None [] x [] [] None None None [] None [] [] [])
           | Error e => Error e
           end
       | 7, 7 => (*int64*)
           match add_lists_int64 int64_A int64_B with
           | Success x =>
-              Success (TensorProto_constructor dims_A (int32_of_Z 7%Z) None [] [] [] x None None None [] None [] [] [])
+              Success (TensorProto_constructor dims_A (Some (int32_of_Z 7%Z)) None [] [] [] x None None None [] None [] [] [])
           | Error e => Error e
           end
       | _, _ => Error "Gemm: all tensors must have the same datatype, which must be FLOAT, INT32 or INT64"
