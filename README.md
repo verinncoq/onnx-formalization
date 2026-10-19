@@ -46,6 +46,14 @@ dune exec ./ONNXConverter/runner/onnx_converter_runner.exe \
 
 ### Differential Tests
 Compares Rocq evaluation results with ONNX runtime execution.
+
+#### Full Tests
+```bash
+dune test
+```
+Runs differential tests on all ONNX models in `experiments/output_comparison/dataset/` using the verification script.
+
+#### Test Specific Model
 ```bash
 python3 ./ONNXEvaluator/comparer/comparer.py \
   20 \
