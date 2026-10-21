@@ -33,13 +33,21 @@ Record NetworkVariableValues (d : NetworkDeclaration) :=
     }.
 
 Definition createNetworkVariableValues {d} (impl : NetworkImplementation d)
-    (ia : InputAssignment d) : NetworkVariableValues d :=
-  let: networkImplementation network hiddenNodeMapping := impl in
-  let inputs : InputValues d := fun i => theoryTensor n n' (ia i) in
-  variableValues d inputs
-    (fun i => Semantics.model n n' network inputs (hiddenNodeMapping i))
-    (fun i => Semantics.model n n' network inputs
-       (projT2 (modelOutputs n network (mem_tnth i (in_tuple (typeOfOutputs d)))))).
+  (ia : InputAssignment d) : NetworkVariableValues d :=
+  let network := Syntax.model d impl in
+  let hiddenNodeMapping := hiddenNodeMapping d impl in
+  (* let networkImplementation network hiddenNodeMapping := impl in *)
+  let inputs : InputValues d := (fun i => theoryTensor n n' (ia i)) in
+  let hidden : HiddenValues d := (fun i => (Semantics.model n n' network inputs
+                                              (hiddenNodeMapping i))) in
+  let outputs : OutputValues d :=
+    (fun i => (Semantics.model n n' network inputs
+                 (projT2 ((modelOutputs n network) i)))) in
+  {|
+    inputs := inputs;
+    hidden := hidden;
+    outputs := outputs
+  |}.
 
 Definition Environment (G : NetworkDeclarations) : Type :=
   forall i : 'I_(size G), NetworkVariableValues (tnth (in_tuple G) i).

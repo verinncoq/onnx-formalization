@@ -826,6 +826,25 @@ Qed.
 
 HB.instance Definition _ := hasDecEq.Build ModelProto ModelProtoEqP.
 
+Definition vertexEq : rel vertex :=
+  fun v1 v2 =>
+match v1, v2 with
+| node x, node y => x == y
+| tensor x, tensor y => x == y
+| input x, input y => x == y
+| output x, output y => x == y
+| _, _ => false
+end.
+
+Definition vertexEqP : Equality.axiom vertexEq.
+Proof.
+move=> [n1 | t1 | i1 | o1] [n2 | t2 | i2 | o2];
+apply:(iffP idP) => //=; try by move=> /eqP ->.
+all: by case=> /eqP.
+Qed.
+
+HB.instance Definition _ := hasDecEq.Build vertex vertexEqP.
+
 (********************************************)
 (******** QUOTIENT BY RELEVANT DATA *********)
 (********************************************)
@@ -918,3 +937,4 @@ HB.instance Definition _ := isEqQuotient.Build TensorProto tensor_eqmod qTensor 
 Lemma qtensor_eqmodP (x y : TensorProto) :
   reflect (x = y %[mod qTensor]) (tensor_eqmod x y).
 Proof. by rewrite -qtensor_pi_eq; apply: eqP. Qed.
+

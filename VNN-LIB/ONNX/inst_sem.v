@@ -250,16 +250,6 @@ exact: (@Tensor _ _ dims _ int32 (map_mx (fun h1 => mc_inst.int32_of_Z (- (Z_of_
 exact: (@Tensor _ _ dims _ int64 (map_mx (fun h1 => mc_inst.int64_of_Z (- (Z_of_int64 h1))) (\val t))).
 Defined.
 
-Lemma add_lists_float32_sized {s1 s2 : seq float32}
-  : size s1 = size s2 -> exists s3,
-add_lists_float32 s1 s2 = Success s3.
-Proof.
-move=> H.
-elim: s2 s1 H=> //= [[|//=] | x xs IHx [//| y ys] /= H]; first by exists [::].
-have [z ->]:= (IHx ys (eq_add_S _ _ H)).
-by exists (b32_plus BinarySingleNaN.mode_NE y x :: z)%SEQ.
-Qed.
-
 (* TODO: There is no overflow protection in the type so this cant be done *)
 (* Lemma add_lists_int32_sized {s1 s2 : seq int32} *)
 (*   : size s1 = size s2 -> exists s3, *)
