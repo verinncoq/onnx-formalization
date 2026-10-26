@@ -3111,10 +3111,10 @@ case: x xin well_formed IHk => [n|t|v|v] /= xin well_formed IHk.
 Qed.
 
 
-Definition sized_model (d : NetworkType Elem) : eqType :=
+Definition well_formed_model (d : NetworkType Elem) : eqType :=
   { m : ModelProto | network_dim_match m d && model_well_formed m}.
 
-Definition nodeOutput (y : NetworkType Elem) (m' : sized_model y) (s : string)
+Definition nodeOutput (y : NetworkType Elem) (m' : well_formed_model y) (s : string)
 (d : TensorType Elem) : eqType :=
 match m' with
 | exist m _ =>
@@ -3133,9 +3133,6 @@ looks up the model's actual list of graph outputs (ModelProto -> GraphProto
 -> list ValueInfoProto) at that same position, and pairs that output's name
 with the NodeProto that produces it.
 *)
-
-Definition emptyValueInfoProto : ValueInfoProto :=
-  ValueInfoProto_constructor None None None nil.
 
 (** The network type's outputs line up one-to-one with the graph outputs. **)
 Lemma network_dim_match_size {y : NetworkType Elem} {m : ModelProto} :
@@ -3172,7 +3169,7 @@ by move=> ->.
 Qed.
 
 (** For each out in the graphproto.outputs, find the valueInfoProto  **)
-Definition mOutputs (y : NetworkType Elem) (m : sized_model y) :
+Definition mOutputs (y : NetworkType Elem) (m : well_formed_model y) :
   {dffun forall i : 'I_(size (outputs Elem y)),
  {u : string & nodeOutput y m u (tnth (in_tuple (outputs Elem y)) i)}} :=
   match m as m0 return
@@ -3191,8 +3188,8 @@ valid model output. Fix Model so that it holds enough information to construct
 this. NodeOutput should be an inductive type that points to constructors **)
 
 (** Ignores renaming and reordering, graph isomorphism problem. **)
-Definition is_iso (y1 y2 : NetworkType Elem) (m1 : sized_model y1)
-(H : NetworkShapesMatch y1 y2) (m2 : sized_model y2) : bool :=
+Definition is_iso (y1 y2 : NetworkType Elem) (m1 : well_formed_model y1)
+(H : NetworkShapesMatch y1 y2) (m2 : well_formed_model y2) : bool :=
 match m1, m2 with
 | exist (ModelProto_constructor _ _ _ _ _ _ _ x _ _ _ _) _,
   exist (ModelProto_constructor _ _ _ _ _ _ _ x' _ _ _ _) _ =>
@@ -3210,7 +3207,7 @@ Definition syntax_inst : NetworkTheorySyntax :=
   {|
       ElementType := Elem;
       TheoryTensor := sized_tensor;
-      Model := sized_model;
+      Model := well_formed_model;
       NodeOutputName := string;
       NodeOutput := nodeOutput;
       modelOutputs := mOutputs;
