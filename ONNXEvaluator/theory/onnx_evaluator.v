@@ -163,7 +163,7 @@ Definition onnx_evaluator (model: ModelProto) (user_inputs: list TensorProto) : 
     | Some graph => match graph with
       | GraphProto_constructor nodes _ initializers _ _ inputs outputs _ _ _ =>
         let vertices := (map (fun x => node x) (rev nodes)) ++ (map (fun x => input x) inputs) ++ (map (fun x => tensor x) initializers) in
-        let evaluate := onnx_evaluator_recursive (length vertices) user_inputs vertices in
+        let evaluate := onnx_evaluator_recursive (S (length vertices)) user_inputs vertices in
         let output_vertices := map (fun x => output x) outputs in
         list_error_option_to_error_option_list (map evaluate output_vertices)
       end

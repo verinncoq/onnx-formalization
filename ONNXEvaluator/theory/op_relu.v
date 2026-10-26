@@ -71,14 +71,14 @@ Definition relu (X: TensorProto) : error_option TensorProto :=
             match int32_of_bytes bytes with
             | Success ints =>
               let relu := map relu_int32 ints in
-              Success (TensorProto_constructor dims (Some (int32_of_Z 1%Z)) None [] relu [] [] None None None [] None [] [] [])
+              Success (TensorProto_constructor dims (Some (int32_of_Z 6%Z)) None [] relu [] [] None None None [] None [] [] [])
             | Error e => Error e
             end
           | None => Error "TensorProto with type int32 must either have non-empty int32_data or non-empty raw_data"
           end
         | ints =>
         let relu := map relu_int32 ints in
-        Success (TensorProto_constructor dims (Some (int32_of_Z 1%Z)) None [] relu [] [] None None None [] None [] [] [])
+        Success (TensorProto_constructor dims (Some (int32_of_Z 6%Z)) None [] relu [] [] None None None [] None [] [] [])
         end
 
       | 7%Z => (*int64*)
@@ -89,14 +89,14 @@ Definition relu (X: TensorProto) : error_option TensorProto :=
             match int64_of_bytes bytes with
             | Success ints =>
               let relu := map relu_int64 ints in
-              Success (TensorProto_constructor dims (Some (int32_of_Z 1%Z))  None [] [] [] relu None None None [] None [] [] [])
+              Success (TensorProto_constructor dims (Some (int32_of_Z 7%Z))  None [] [] [] relu None None None [] None [] [] [])
             | Error e => Error e
             end
           | None => Error "TensorProto with type int64 must either have non-empty int_data or non-empty raw_data"
           end
         | ints =>
         let relu := map relu_int64 ints in
-        Success (TensorProto_constructor dims (Some (int32_of_Z 1%Z))  None [] [] [] relu None None None [] None [] [] [])
+        Success (TensorProto_constructor dims (Some (int32_of_Z 7%Z))  None [] [] [] relu None None None [] None [] [] [])
         end
       | _ => Error "ReLU: Tensor Datatype must either be float32, int32 or int64"
       end
