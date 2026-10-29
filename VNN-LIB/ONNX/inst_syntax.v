@@ -144,15 +144,33 @@ Definition has_value_tensor_type (v : ValueInfoProto) : bool :=
   | _ => false
   end.
 
+(** The concrete dims a value declares, provided every dimension is a dim_value. *)
+Definition value_dims (v : ValueInfoProto) : option (seq int64) :=
+  let: ValueInfoProto_constructor _ ty _ _ := v in
+  if ty is Some (TypeProto_constructor (Some (tensor_type_value_TypeProto
+       (Tensor_TypeProto_constructor _ (Some (TensorShapeProto_constructor ds))))) _) then
+    let dv d := if d is Dimension_TensorShapeProto_constructor
+                          (Some (dim_value_value_Dimension_TensorShapeProto i)) _
+                then Some i else None in
+    if all (fun d => isSome (dv d)) ds then Some (pmap dv ds) else None
+  else None.
+
+Definition int64_to_dim (i : int64) : nat := Z.to_nat (Z_of_int64 i).
+
+(** A declared value has the dtype and the dims of a network tensor type. *)
+Definition value_has_type (x : TensorType Elem) (v : ValueInfoProto) : bool :=
+  (value_tensor_type v == Some (tag (tensorTypes _ x))) &&
+  (omap (map int64_to_dim) (value_dims v) ==
+   Some (map (fun q : {posnum nat} => q%:num) (tval (projT2 (tensorDims _ x))))).
+
+(** The model's graph inputs and outputs have the types of the network type. *)
 Definition network_dim_match (m : ModelProto) (n : NetworkType Elem) : bool :=
 match n with
 | networkType (exist inps inpsgt0) (exist outs outsgt0) =>
     [&& (subseq (graph_inputs m) (model_values m)),
       (subseq (graph_outputs m) (model_values m)),
-      all2 (fun x => eq_op (Some (tag (tensorTypes Elem x)))) inps (map value_tensor_type (graph_inputs m)) (** A predicate that says the shape and types of the NetworkType are respected by the model's outputs **)
-         (** A predicate that says the shape and types of the NetworkType are respected by the model's outputs **)
-      (* all (oapp (mem supported_types) false) (map value_tensor_type (graph_outputs m)) (** A predicate saying that all outputs must exist and have a valid type **) *)
-      & all2 (fun x => eq_op (Some (tag (tensorTypes Elem x)))) outs (map value_tensor_type (graph_outputs m))]
+      all2 value_has_type inps (graph_inputs m) &
+      all2 value_has_type outs (graph_outputs m)]
 end.
 
 Lemma isSuccess_map {T1 T2} (f : T1 -> error_option T2) (xs : seq T1)
@@ -631,8 +649,6 @@ case: o1 o2 => [a|] [b|] //= /andP[/Z.eqb_spec ab /or3P[] /Z.eqb_spec za].
 - by eapply VP7; [reflexivity | reflexivity | exact: za | rewrite -ab].
 Qed.
 
-
-Definition int64_to_dim (i : int64) : nat := Z.to_nat (Z_of_int64 i).
 
 (* does p's actual dims list match the declared shape d? *)
 Definition dims_match (p : TensorProto) (d : {k : nat & {posnum nat} ^ k}) : bool :=
@@ -2750,17 +2766,6 @@ move: vin; case: v => [[ins outs nm [op|] dom ov attrs doc meta x]|t'|[[nmi|] ? 
   by rewrite Mw (Lo _ nmo w vin erefl F).
 Qed.
 
-(** The concrete dims a value declares, provided every dimension is a dim_value. *)
-Definition value_dims (v : ValueInfoProto) : option (seq int64) :=
-  let: ValueInfoProto_constructor _ ty _ _ := v in
-  if ty is Some (TypeProto_constructor (Some (tensor_type_value_TypeProto
-       (Tensor_TypeProto_constructor _ (Some (TensorShapeProto_constructor ds))))) _) then
-    let dv d := if d is Dimension_TensorShapeProto_constructor
-                          (Some (dim_value_value_Dimension_TensorShapeProto i)) _
-                then Some i else None in
-    if all (fun d => isSome (dv d)) ds then Some (pmap dv ds) else None
-  else None.
-
 (** The static shape of a value name: an initialiser's own dims, otherwise the
     first declaration of that name. *)
 Definition name_shape (initialisers : seq TensorProto) (decls : seq ValueInfoProto)
@@ -2907,208 +2912,100 @@ apply: (eval_static_dims _ _ _ _ (fun w => shn (seq.head ""%string (vnames w))) 
   by case: (get_gemm_attributes attrs) => [[[? ?] ?] ?] /andP [_ /eqP <-].
 Qed.
 
-Definition model_well_formed (m : ModelProto) : bool :=
+(** The syntactic part of well-formedness: facts about the ONNX graph
+    itself, independent of how it is evaluated. *)
+Definition model_syntax_ok (m : ModelProto) : bool :=
   if m is ModelProto_constructor _ _ _ _ _ _ _ (Some graph) _ _ _ _ then
-  let : GraphProto_constructor nodes _ initialisers _ _ inputs outputs value_info _ _ := graph in
+  let : GraphProto_constructor nodes _ initialisers _ _ inputs outputs _ _ _ := graph in
   let items := ([seq node x0 | x0 <- List.rev nodes] ++ [seq input x0 | x0 <- inputs] ++ [seq tensor x0 | x0 <- initialisers])%SEQ in
-  let shn := name_shape initialisers (inputs ++ outputs ++ value_info)%SEQ in
-  [&& (0 <= size items)%nat, (** Minimum graph has 1 elements, an input **)
-    graph_acyclic nodes inputs initialisers,
-    all (fun x => if value_name x is Some s then one_element (find_vertex items s) else false) outputs,
-    all (predI valid_op (predI (node_shape_ok shn) (gemm_int_attrs_ok \o get_attributes))) nodes, (** nodes are topologically sorted **)
-    (** every output declares the same dtype, which every initialiser has **)
-    all (fun o => if value_tensor_type o is Some dt then
-                    all (fun o' => value_tensor_type o' == Some dt) outputs &&
-                    all (fun t => tensor_dtype t == Some dt) initialisers
-                  else false) outputs,
-    all (predI tensorProtoSized (dims_correct \o get_dims)) initialisers,
-    (** static shapes: every node checks locally, initialisers and inputs
-        have their declared shape **)
-    all (fun t => if tensor_name t is Some s then shn s == mat_dims (get_dims t)
-                      else false) initialisers &
-        all (fun i => if value_name i is Some nm then
-                        Some (shn nm) == omap mat_dims (value_dims i)
-                      else false) inputs]
+  let dt := if outputs is o :: _ then value_tensor_type o else None in
+  [&& (** names are unique and every node input is defined before it is used **)
+      graph_acyclic nodes inputs initialisers, (** The graph structure is acyclic **)
+      (** every output names exactly one vertex, and that vertex is a node **)
+      all (fun x => if value_name x is Some s then
+                      if find_vertex items s is [:: node _] then true else false
+                    else false) outputs,
+      (** inputs and outputs are named, declare their dims, and share one dtype dt **)
+      all (fun v => [&& value_tensor_type v != None, value_tensor_type v == dt,
+                        value_name v != None & value_dims v != None]) (inputs ++ outputs) &
+      (** initialisers are named, have dtype dt, and their data fills their dims **)
+      all (fun t => [&& tensor_dtype t == dt, tensorProtoSized t & tensor_name t != None])
+          initialisers]
   else false.
 
-Lemma well_formed_computes (m : ModelProto) (xs : seq TensorProto)
-  : all tensorProtoSized xs ->
-    all (fun o => all (fun u => tensor_dtype u == value_tensor_type o) xs) (graph_outputs m) ->
-    all (fun u => dims_correct (get_dims u)) xs ->
-    all (fun i => if value_name i is Some nm then
-                    all (fun u => tensor_has_name nm u ==>
-                                  (omap mat_dims (value_dims i) == Some (mat_dims (get_dims u)))) xs
-                  else true) (graph_inputs m) ->
-    (** every graph input is named and given exactly one user tensor **)
-    all (fun i => if value_name i is Some nm then
-                    size (filter (tensor_has_name nm) xs) == 1%nat
-                  else false) (graph_inputs m) ->
-    model_well_formed m -> isSuccess (onnx_evaluator m xs).
-Proof.
-move=> inputs_sized inputs_dt xs_dc xs_sh in_one H.
-rewrite /onnx_evaluator.
-case: m inputs_dt xs_sh in_one H => ir opset prod_name prod_vers domain model_version doc [[nodes name initialisers sparse_initialisers doc_string inputs outputs value_info quantisation metadata_props]|//] metadata training functions config inputs_dt xs_sh in_one well_formed /=.
-rewrite isSuccess_map.
-rewrite all_map.
-apply/allP => /= x xin.
-rewrite length_size !listmap_map !app_cat.
-move H: ([seq node x0 | x0 <- List.rev nodes] ++
-           [seq input x0 | x0 <- inputs] ++ [seq tensor x0 | x0 <- initialisers])%SEQ => items.
-move H': (size items) => k.
-(* case: k H' => [|k ksize] /=. *)
-(* move: well_formed => /andP [H' _]. (* size0. *) *)
-(* move: H'. *)
-(* by rewrite H size0. *)
-(* case: x {xin}. *)
-(* case=>[x_name|]; last first. *)
-(* admit. (** output has name **) *)
-(* move=> x_type x_doc x_meta. *)
-(* suff: exists y, List.filter (vertex_has_name x_name) items = [:: y] /\ y \in items; last admit. (** Output name is unique **) *)
-(* move=> [y [-> yin]]. *)
-(* elim: k ksize y yin nodes inputs initialisers well_formed H => [| k IHk] ksize y yin nodes inputs initialisers well_formed H. *)
-(* move: well_formed => /andP []. *)
-(* by rewrite H ksize. *)
-(* case: y yin IHk => /=. *)
+(** The part of well-formedness specific to our evaluator: only Gemm and Relu,
+    every value is a matrix (rank <= 2), and the static matrix shapes check. *)
+Definition model_eval_ok (m : ModelProto) : bool :=
+  if m is ModelProto_constructor _ _ _ _ _ _ _ (Some graph) _ _ _ _ then
+  let : GraphProto_constructor nodes _ initialisers _ _ inputs outputs value_info _ _ := graph in
+  let shn := name_shape initialisers (inputs ++ outputs ++ value_info)%SEQ in
+  let mat_shape s ds := dims_correct ds && (shn s == mat_dims ds) in
+  [&& all (predI valid_op (predI (node_shape_ok shn) (gemm_int_attrs_ok \o get_attributes))) nodes,
+      all (fun v => if (value_name v, value_dims v) is (Some s, Some ds) then mat_shape s ds
+                    else false) (inputs ++ outputs) &
+      all (fun t => if tensor_name t is Some s then mat_shape s (get_dims t) else false)
+          initialisers]
+  else false.
 
-move: xin.
-rewrite listmap_map.
-case: x => x /mapP [// x0 xin [xis]].
-move: xin.
-rewrite -xis => xin.
-move/and5P: well_formed => [w1 w3 /allP /(_ x xin) + w_nodes].
-move=> + /and4P [/allP /(_ x xin) w6 w_init init_sh in_chk].
-move: w_nodes w_init; rewrite all_predI => /andP [w2].
-rewrite all_predI => /andP [nodes_sh w5].
-rewrite all_predI => /andP [w4 init_dc].
-move/allP/(_ x xin): inputs_dt => xs_dt.
-case: (value_tensor_type x) w6 xs_dt => [dt|//] /andP [_ init_dt] xs_dt.
-move: (name_shape _ _) nodes_sh init_sh in_chk => shn nodes_sh init_sh in_chk.
-have in_sh : forall i, i \in inputs -> forall nm u, value_name i = Some nm -> u \in xs ->
-    tensor_has_name nm u -> shn nm = mat_dims (get_dims u).
-  move=> i iin nm u E ux hn; move: (allP in_chk i iin) (allP xs_sh i iin); rewrite E => /eqP e.
-  by move=> /allP /(_ u ux); rewrite hn -e => /eqP [].
-move=> {in_chk xs_sh}.
-have {in_one} in_one : all (fun i => if value_name i is Some nm then
-    size (filter (tensor_has_name nm) xs) == 1%nat else false) inputs := in_one.
-rewrite /value_name.
-case: x x0 xis xin => [[xname|//]] xtype xstring xmeta /[dup] /= x' x'' -> xin'.
-case/one_elementP => x /[dup] /finds_in.
-rewrite H => xin.
-rewrite /find_vertex => ->.
-move=> {x' x'' xin' xname xtype xstring xmeta ir opset prod_name prod_vers domain model_version doc name doc_string value_info quantisation metadata_props metadata training functions config}.
-move/graph_acyclic_at:w3.
-rewrite /= /graph_items H=> /(_ x xin) w3.
-have {w1 w2 w3 w4 w5} well_formed := (And5 w1 w2 w3 w4 w5).
-elim: k x items xin H' nodes inputs initialisers H well_formed init_dt init_dc init_sh in_sh nodes_sh in_one => //= [|k IHk] x items xin H' nodes inputs initialisers H well_formed init_dt init_dc init_sh in_sh nodes_sh in_one.
-(* elim: k x items H' nodes inputs initialisers H well_formed => //= [|k IHk] x items H' nodes inputs initialisers H well_formed. *)
-  by move/eqP: H'; rewrite size_eq0 => /eqP E; rewrite E in xin.
-(* rewrite !size_cat H' => ->. *)
-(* rewrite !size_cat. !addn_eq0 !size_map. => /and3P [_ /eqP -> _]. *)
-case: x xin well_formed IHk => [n|t|v|v] /= xin well_formed IHk.
-- (** node **)
-  have ninnodes : n \in nodes.
-    by move: xin; rewrite -H -/(graph_items _ _ _) mem_graph_items_node.
-  case: (well_formed) => _ vo ac Si go.
-  have vop := allP vo n ninnodes; have gi := allP go n ninnodes.
-  (** evaluating an input of [n] succeeds in the whole graph **)
-  have child i w : i \in node_inputs n -> find_vertex items i = [:: w] ->
-      isSuccess (onnx_evaluator_recursive k xs items w).
-    move=> iin F; apply: (onnx_evaluator_rec_S _ _ _ n _ ac).
-    have wn : w != node n.
-      by have [w' F' wn] := acyclic_at_find ac iin; move: F' wn; rewrite F => -[->].
-    have H'' : graph_items (rev (rem n (rev nodes))) inputs initialisers =
-               rem (node n) items.
-      by rewrite /graph_items rev_is_rev revK -H rem_cat.
-    apply: (IHk w _ _ _ _ inputs initialisers H'' _ init_dt init_dc init_sh in_sh
-              (all_rem_rev _ _ _ nodes_sh) in_one).
-    - exact: rem_mem (finds_in F).
-    - by rewrite size_rem // H'.
-    - case: well_formed => _ vo' _ si go'; split => //; first exact: all_rem_rev.
-        exact: (acyclic_at_child _ _ _ _ ac iin F).
-      exact: all_rem_rev.
-  (** the evaluated inputs are sized, have dtype [dt] and their static shape **)
-  have Ti (P : TensorProto -> Prop) : (forall u, u \in initialisers -> P u) ->
-      forall w, w \in items -> forall u, tensor u \in w :: items -> P u.
-    move=> HP w win u; rewrite in_cons => /orP [/eqP uw|ui]; apply: HP.
-      by move: win; rewrite -uw -H -/(graph_items _ _ _) mem_graph_items_tensor.
-    by move: ui; rewrite -H -/(graph_items _ _ _) mem_graph_items_tensor.
-  have Sv w t : w \in items -> onnx_evaluator_recursive k xs items w = Success t ->
-      tensorProtoSized t.
-    move=> win; apply: (eval_sized _ _ _ _ _ inputs_sized).
-    by apply: (Ti _ _ w win) => u; apply: (allP Si).
-  have Dv w t : w \in items -> onnx_evaluator_recursive k xs items w = Success t ->
-      tensor_dtype t = Some dt.
-    move=> win; apply: (eval_dtype _ _ _ _ _ _ xs_dt).
-    by apply: (Ti _ _ w win) => u /(allP init_dt) /eqP.
-  have Gd i w t : find_vertex items i = [:: w] ->
-      onnx_evaluator_recursive k xs items w = Success t ->
-      dims_correct (get_dims t) /\ mat_dims (get_dims t) = shn i.
-    move: (Si) => Si'; rewrite -H => F E.
-    have [c m] := eval_graph_dims _ _ _ _ _ _ _ _ inputs_sized xs_dc Si' init_dc init_sh
-                    in_sh nodes_sh (finds_in F) E.
-    by rewrite (graph_sh_find _ _ _ _ _ _ nodes_sh F) in m.
-  have Nn := allP nodes_sh n ninnodes.
-  case: (valid_opP ac vop) => /=.
-  + (** Gemm 2 inputs **)
-    move=> a b va vb outs nm dom ov attrs doc meta x' nis Fa Fb _.
-    have ina : a \in node_inputs n by rewrite nis /= inE eqxx.
-    have inb : b \in node_inputs n by rewrite nis /= !inE eqxx orbT.
-    rewrite nis /= Fa Fb.
-    case/isSuccessP: (child a va ina Fa) => t0 E0.
-    case/isSuccessP: (child b vb inb Fb) => t1 E1.
-    rewrite E0 E1.
-    have [c0 m0] := Gd _ _ _ Fa E0; have [c1 m1] := Gd _ _ _ Fb E1.
-    move: Nn; rewrite nis => /node_shape_gemm Nn.
-    apply: gemm_two_success.
-    - by rewrite /= (Dv _ _ (finds_in Fa) E0) (Dv _ _ (finds_in Fb) E1) eqxx.
-    - exact: Sv (finds_in Fa) E0.
-    - exact: Sv (finds_in Fb) E1.
-    - apply: (static_gemm_dims_ok _ _ _ _ _ c0 c1 m0 m1).
-      by move: Nn; case: (get_gemm_attributes _) => [[[? ?] ?] ?] /andP [].
-    - by move=> _; move: gi; rewrite nis.
-  + (** Gemm 3 inputs **)
-    move=> a b c va vb vc outs nm dom ov attrs doc meta x' nis Fa Fb Fc _.
-    have ina : a \in node_inputs n by rewrite nis /= inE eqxx.
-    have inb : b \in node_inputs n by rewrite nis /= !inE eqxx orbT.
-    have inc : c \in node_inputs n by rewrite nis /= !inE eqxx !orbT.
-    rewrite nis /= Fa Fb Fc.
-    case/isSuccessP: (child a va ina Fa) => t0 E0.
-    case/isSuccessP: (child b vb inb Fb) => t1 E1.
-    case/isSuccessP: (child c vc inc Fc) => t2 E2.
-    rewrite E0 E1 E2.
-    have [c0 m0] := Gd _ _ _ Fa E0; have [c1 m1] := Gd _ _ _ Fb E1.
-    have [c2 m2] := Gd _ _ _ Fc E2.
-    move: Nn; rewrite nis => Nn.
-    have G : gemm_dims_ok (get_dims t0) (get_dims t1) attrs.
-      apply: (static_gemm_dims_ok _ _ _ _ _ c0 c1 m0 m1).
-      by move/node_shape_gemm: Nn; case: (get_gemm_attributes _) => [[[? ?] ?] ?] /andP [].
-    apply: gemm_three_success.
-    - rewrite /= (Dv _ _ (finds_in Fa) E0) (Dv _ _ (finds_in Fb) E1).
-      by rewrite (Dv _ _ (finds_in Fc) E2) !eqxx.
-    - exact: Sv (finds_in Fa) E0.
-    - exact: Sv (finds_in Fb) E1.
-    - exact: Sv (finds_in Fc) E2.
-    - rewrite /gemm3_dims_ok G c2 m0 m1 m2.
-      move/node_shape_gemm3: Nn.
-      by case: (get_gemm_attributes _) => [[[? ?] ?] ?] /=; case: (shn c).
-    - by move=> _; move: gi; rewrite nis.
-  + (** Relu **)
-    move=> a va outs nm dom ov attrs doc meta x' nis Fa _.
-    have ina : a \in node_inputs n by rewrite nis /= inE eqxx.
-    rewrite nis /= Fa.
-    case/isSuccessP: (child a va ina Fa) => t0 E0.
-    by rewrite E0; apply/relu_success/(Sv _ _ (finds_in Fa) E0).
-- by []. (** tensor **)
-- (** input **)
-  move=> {well_formed IHk}.
-  have iin : v \in inputs.
-    by move: xin; rewrite -H -/(graph_items _ _ _) mem_graph_items_input.
-  move: (allP in_one v iin); case: v {xin iin} => [[nm|] ? ? ?] //= one.
-  rewrite filterE; move: one.
-  by case: (filter (tensor_has_name nm) xs) => [|u [|? ?]].
-- (** output **)
-  by move: xin; rewrite -H -/(graph_items _ _ _) output_notin_graph_items.
-Qed.
+Definition model_well_formed (m : ModelProto) : bool :=
+  model_syntax_ok m && model_eval_ok m.
+
+(* Definition value_name_unique (v : ValueInfoProto) : bool := *)
+(*   if v is Some s then uniq ( *)
+
+(* Open Scope seq_scope. *)
+(* Lemma listfilter_is_filter {T} (f : T -> bool) (xs : seq T) : List.filter f xs = [seq x <- xs | f x]. *)
+(* Proof. by elim: xs. Qed. *)
+
+(* Lemma filter_unique_name (T : Type) (name : T -> string) (s : seq T) (n : string) : *)
+(*   uniq (map name s) -> n \in map name s -> *)
+(*   exists y, [seq x <- s | name x == n] = [:: y]. *)
+(* Proof. *)
+(* move=> Huniq Hin. *)
+(* have Hsize : size [seq x <- s | name x == n] = 1%nat. *)
+(* rewrite size_filter. *)
+(* have -> : count (fun x => name x == n) s = count (pred1 n) (map name s). *)
+(* by rewrite count_map. *)
+(* by rewrite count_uniq_mem // Hin. *)
+(* by case: [seq x <- s | name x == n] Hsize => [|y [|z t]] // _; exists y. *)
+(* Qed. *)
+
+(* Variant graph_of_spec (m : ModelProto) : Prop := *)
+(*   | Graph ir ops prod_n prod_v domain model_v doc graph meta training funcs config g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta vertices of *)
+(*       m = ModelProto_constructor ir ops prod_n prod_v domain model_v doc (Some graph) meta training funcs config & *)
+(*       graph = GraphProto_constructor g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta & *)
+(*       vertices = [seq node x | x <- List.rev g_nodes] ++ [seq input x | x <- g_input] ++ [seq tensor x | x <- g_initialisers] & *)
+(*       all value_name g_output & *)
+(*       uniq [seq vnames v | v <- vertices]. *)
+(*       (* all (fun x_name => if [seq x <- vertices | vertex_has_name x_name x] is [:: v] then true else false) [seq value_info_name x | x <- g_output]. *) *)
+
+(* Definition test (m : ModelProto) : bool := *)
+(*   graph_of m. *)
+
+(* Lemma graph_ofP {m : ModelProto} : test m -> graph_of_spec m. *)
+(* Admitted. *)
+(* (* Proof. *) *)
+(* (* case: m => ir ops prod_n prod_v domain model_v doc [[g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta]|//] meta training funcs config H. *) *)
+(* (* by apply: (Graph _ ir ops prod_n prod_v domain model_v doc (GraphProto_constructor g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta)  meta training funcs config). *) *)
+(* (* Qed. *) *)
+(* (* [&& graph_of m]. *) *)
+
+(* Lemma well_formed_computes (m : ModelProto) (xs : seq TensorProto) : *)
+(*   test m -> isSuccess (onnx_evaluator m xs). *)
+(* Proof. *)
+(* rewrite /onnx_evaluator. *)
+(* case/graph_ofP => ir ops prod_n prod_v domain model_v doc graph meta training funcs config g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta vertices mis gis vertices_is /allP all_outputs_named /uniqP /= vnames_unique. *)
+(* rewrite mis gis. *)
+(* rewrite !listmap_map !length_size isSuccess_map !app_cat -vertices_is. *)
+(* rewrite all_map. *)
+(* apply/allP => /= [[]] x; *)
+(* case/mapP => //= out outin outx. *)
+(* move: outx outin => [] <- xin {out}. *)
+(* move: (all_outputs_named x xin). *)
+(* case: x xin => //= [[]] // x_name x_type x_doc x_meta xin _. *)
+(* rewrite !listfilter_is_filter. *)
+(* move: vnames_unique => /(_ [seq vnames x | x <- vertices]). *)
+
 
 
 Definition well_formed_model (d : NetworkType Elem) : eqType :=
@@ -3118,8 +3015,8 @@ Definition nodeOutput (y : NetworkType Elem) (m' : well_formed_model y) (s : str
 (d : TensorType Elem) : eqType :=
 match m' with
 | exist m _ =>
-    { v : ValueInfoProto | (v \in model_values m) && (value_info_name v == s) &&
-                             (value_tensor_type v == Some (tag (tensorTypes _ d)))}
+    { v : ValueInfoProto |
+      [&& v \in graph_outputs m, value_info_name v == s & value_has_type d v]}
 end.
 
 Definition producing_node (m : ModelProto) (u : string) : NodeProto :=
@@ -3139,7 +3036,7 @@ Lemma network_dim_match_size {y : NetworkType Elem} {m : ModelProto} :
   network_dim_match m y -> size (outputs Elem y) = size (graph_outputs m).
 Proof.
 case: y => [[inps Hin] [outs Hout]] /= /and4P [_ _ _].
-by rewrite all2E size_map => /andP [/eqP].
+by rewrite all2E => /andP [/eqP].
 Qed.
 
 (** The graph output at the same position as the i-th declared output. **)
@@ -3150,20 +3047,19 @@ Definition mOutput_value {y : NetworkType Elem} {m : ModelProto}
 Lemma mOutput_valueP {y : NetworkType Elem} {m : ModelProto}
   (H : network_dim_match m y) (i : 'I_(size (outputs Elem y))) :
   let v := mOutput_value H i in
-  (v \in model_values m) && (value_info_name v == value_info_name v) &&
-    (value_tensor_type v == Some (projT1 (tensorTypes _ (tnth (in_tuple (outputs Elem y)) i)))).
+  let d := tnth (in_tuple (outputs Elem y)) i in
+  [&& v \in graph_outputs m, value_info_name v == value_info_name v & value_has_type d v].
 Proof.
-rewrite /mOutput_value eqxx andbT.
+rewrite /mOutput_value eqxx /=.
 move: (network_dim_match_size H) => E; move: i E H.
 case: y => [[inps Hin] [outs Hout]] /= i E /and4P [_ outsub _].
-rewrite all2E size_map => /andP [_ /all_nthP outsame].
-have /(mem_subseq outsub) -> /= :
-  tnth (in_tuple (graph_outputs m)) (cast_ord E i) \in graph_outputs m := mem_tnth _ _.
+rewrite all2E => /andP [_ /all_nthP outsame].
+rewrite mem_tnth /=.
 set v := tnth (in_tuple (graph_outputs m)) (cast_ord E i).
 set o := tnth (in_tuple outs) i.
-have := outsame (o, value_tensor_type v) i.
-rewrite nth_zip_cond size_zip size_map -[in minn _ _]E minnn ltn_ord /= => /(_ isT) /eqP.
-rewrite (nth_map v) -?E // -[nth o outs i](tnth_nth o (in_tuple outs) i).
+have := outsame (o, v) i.
+rewrite nth_zip_cond size_zip -[in minn _ _]E minnn ltn_ord /= => /(_ isT).
+rewrite -[nth o outs i](tnth_nth o (in_tuple outs) i).
 rewrite -[nth v _ i](tnth_nth v (in_tuple (graph_outputs m)) (cast_ord E i)) -/v -/o.
 by move=> ->.
 Qed.
