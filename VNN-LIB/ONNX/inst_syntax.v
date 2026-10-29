@@ -334,64 +334,6 @@ have Dv u : u \in items -> forall t'', tensor t'' \in u :: items -> tensor_dtype
 by rewrite /= (eval_dtype _ _ _ _ _ _ Dx (Dv _ vin) Ev) (eval_dtype _ _ _ _ _ _ Dx (Dv _ win) Ew) eqxx.
 Qed.
 
-(* Definition value_name_unique (v : ValueInfoProto) : bool := *)
-(*   if v is Some s then uniq ( *)
-
-(* Open Scope seq_scope. *)
-(* Lemma listfilter_is_filter {T} (f : T -> bool) (xs : seq T) : List.filter f xs = [seq x <- xs | f x]. *)
-(* Proof. by elim: xs. Qed. *)
-
-(* Lemma filter_unique_name (T : Type) (name : T -> string) (s : seq T) (n : string) : *)
-(*   uniq (map name s) -> n \in map name s -> *)
-(*   exists y, [seq x <- s | name x == n] = [:: y]. *)
-(* Proof. *)
-(* move=> Huniq Hin. *)
-(* have Hsize : size [seq x <- s | name x == n] = 1%nat. *)
-(* rewrite size_filter. *)
-(* have -> : count (fun x => name x == n) s = count (pred1 n) (map name s). *)
-(* by rewrite count_map. *)
-(* by rewrite count_uniq_mem // Hin. *)
-(* by case: [seq x <- s | name x == n] Hsize => [|y [|z t]] // _; exists y. *)
-(* Qed. *)
-
-(* Variant graph_of_spec (m : ModelProto) : Prop := *)
-(*   | Graph ir ops prod_n prod_v domain model_v doc graph meta training funcs config g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta vertices of *)
-(*       m = ModelProto_constructor ir ops prod_n prod_v domain model_v doc (Some graph) meta training funcs config & *)
-(*       graph = GraphProto_constructor g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta & *)
-(*       vertices = [seq node x | x <- List.rev g_nodes] ++ [seq input x | x <- g_input] ++ [seq tensor x | x <- g_initialisers] & *)
-(*       all value_name g_output & *)
-(*       uniq [seq vnames v | v <- vertices]. *)
-(*       (* all (fun x_name => if [seq x <- vertices | vertex_has_name x_name x] is [:: v] then true else false) [seq value_info_name x | x <- g_output]. *) *)
-
-(* Definition test (m : ModelProto) : bool := *)
-(*   graph_of m. *)
-
-(* Lemma graph_ofP {m : ModelProto} : test m -> graph_of_spec m. *)
-(* Admitted. *)
-(* (* Proof. *) *)
-(* (* case: m => ir ops prod_n prod_v domain model_v doc [[g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta]|//] meta training funcs config H. *) *)
-(* (* by apply: (Graph _ ir ops prod_n prod_v domain model_v doc (GraphProto_constructor g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta)  meta training funcs config). *) *)
-(* (* Qed. *) *)
-(* (* [&& graph_of m]. *) *)
-
-(* Lemma well_formed_computes (m : ModelProto) (xs : seq TensorProto) : *)
-(*   test m -> isSuccess (onnx_evaluator m xs). *)
-(* Proof. *)
-(* rewrite /onnx_evaluator. *)
-(* case/graph_ofP => ir ops prod_n prod_v domain model_v doc graph meta training funcs config g_nodes g_name g_initialisers g_sparse g_doc g_input g_output g_values g_quant g_meta vertices mis gis vertices_is /allP all_outputs_named /uniqP /= vnames_unique. *)
-(* rewrite mis gis. *)
-(* rewrite !listmap_map !length_size isSuccess_map !app_cat -vertices_is. *)
-(* rewrite all_map. *)
-(* apply/allP => /= [[]] x; *)
-(* case/mapP => //= out outin outx. *)
-(* move: outx outin => [] <- xin {out}. *)
-(* move: (all_outputs_named x xin). *)
-(* case: x xin => //= [[]] // x_name x_type x_doc x_meta xin _. *)
-(* rewrite !listfilter_is_filter. *)
-(* move: vnames_unique => /(_ [seq vnames x | x <- vertices]). *)
-
-
-
 Definition nodeOutput (y : NetworkType Elem) (m' : well_formed_model y) (s : string)
 (d : TensorType Elem) : eqType :=
 match m' with
