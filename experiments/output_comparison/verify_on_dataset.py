@@ -45,7 +45,7 @@ try:
             onnx_proto_path = os.path.join('data', 'onnx.proto')
             result = subprocess.run([
                 sys.executable, comparer_path,
-                '10',
+                '5',
                 full_path,
                 onnx_proto_path
             ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
