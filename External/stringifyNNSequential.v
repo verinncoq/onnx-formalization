@@ -196,6 +196,8 @@ Definition stringifyNNPremodel (nnseq: NNPremodel) : string :=
                          | "0.0" => " "%string
                          | _ => ")"%string
                          end in
+    match bias with
+    | Some bias_name =>
     let bias_prefix := match beta with
                          | "1.0" => ""%string
                          | _ => "(scalar_mult (real_of_string """ ++ beta ++ """) "
@@ -205,7 +207,11 @@ Definition stringifyNNPremodel (nnseq: NNPremodel) : string :=
                          | _ => ") "
                          end in
     "Definition " ++ (makeName name) ++ " := NNLinear " ++ weight_prefix ++ (makeName weight) ++ weight_suffix ++
-    " " ++ bias_prefix ++ (makeName bias) ++ bias_suffix ++ (makeName next) ++ "."
+    " " ++ bias_prefix ++ (makeName bias_name) ++ bias_suffix ++ (makeName next) ++ "."
+    | None => (*bias-less Gemm: the bias term is zero, so the zero colvec is used as bias*)
+      "Definition " ++ (makeName name) ++ " := NNLinear " ++ weight_prefix ++ (makeName weight) ++ weight_suffix ++
+      " 0 " ++ (makeName next) ++ "."
+    end
   | NNPremodel_ReLu name next =>
     "Definition " ++ (makeName name) ++ " := NNReLU " ++ (makeName next) ++ "."
   end.

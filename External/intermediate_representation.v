@@ -108,7 +108,8 @@ Inductive NNPremodel :=
 | NNPremodel_initializer_matrix: string -> nat -> nat -> (nat -> nat -> string) -> NNPremodel
 | NNPremodel_initializer_vector: string -> nat -> (nat -> string) -> NNPremodel
 | NNPremodel_Output: string -> nat -> NNPremodel
-| NNPremodel_Linear: string -> string -> string -> string -> string -> string -> NNPremodel
+(*name, next, weight, bias, transB, beta. The bias is optional (None for a bias-less Gemm, whose bias term is zero)*)
+| NNPremodel_Linear: string -> string -> string -> option string -> string -> string -> NNPremodel
 | NNPremodel_ReLu: string -> string -> NNPremodel.
 
 
