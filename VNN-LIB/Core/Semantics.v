@@ -10,7 +10,7 @@ Open Scope ring_scope.
 (* Parameter n' : NetworkTheorySemantics n. *)
 
 Section Decls.
-Context {n : NetworkTheorySyntax} {n' : NetworkTheorySemantics n}.
+Context {n : NetworkTheorySyntax} (n' : NetworkTheorySemantics n).
 
 Definition InputValues (d : NetworkDeclaration) :=
   TensorsSemantics (elementType _ n') (typeOfInputs d).

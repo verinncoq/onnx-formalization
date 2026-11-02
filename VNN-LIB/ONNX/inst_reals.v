@@ -267,13 +267,21 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
       case Etn: tn tsh => [s|] //= /andP [dc /eqP sh].
       exact: (to_mat s _ shape dims shapeE dc sh (Tensor (map_mx to_R (tensor_val T)))).
     apply: theoryTensorProto.
-    exists (qtensor_pi (TensorProto_constructor dims (Some dt) seg fd i32 sd i64 tn
-                                                ds rd ed dl dd u64 mp)).
+    have tnamed : tn by move: tsh; destruct tn.
+    pose q := qtensor_pi (TensorProto_constructor dims (Some dt) seg fd i32 sd i64 tn
+                                                  ds rd ed dl dd u64 mp).
+    have qsized : tensorProtoSized q && tensorNamed q.
+      rewrite /q /= /storage_of.
+      case: x E Hsize xin {to_R} => // E Hsize xin;
+        [have HZ := DataType_float E | have HZ := DataType_int32 E | have HZ := DataType_int64 E];
+        by rewrite HZ /= E Hsize dpos /=.
+    exists (exist _ q qsized).
+    rewrite /= /q {qsized q tnamed}.
     have Edims : dims = map (tnth (in_tuple dims)) (fintype.enum 'I_(size dims)).
       by rewrite map_tnth_enum.
     case: x E Hsize xin {to_R} => // E Hsize xin;
       [move: (DataType_float E) | move: (DataType_int32 E) | move: (DataType_int64 E)] => Z;
-      rewrite /= /storage_of Z /= E eqxx Hsize dpos /= !andbT;
+      rewrite /= /storage_of Z /= E eqxx /= !andbT;
       rewrite -map_comp; apply/eqP;
       rewrite {1}Edims;
       by rewrite -map_comp enumT; apply: eq_map => i /=; rewrite ffunE insubdK //; exact: pos i.

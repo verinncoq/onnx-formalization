@@ -595,8 +595,17 @@ case E: (DataType_TensorProto_of_int32 dt) => [[]|] //= /eqP H;
                                                     | by eapply TInt64; [reflexivity | exact: E | exact: Hall | exact: H] ].
 Qed.
 
-Definition sized_tensor (t : TensorType Elem) : eqType :=
-  { p : qTensor | dims_match p (tensorDims _ t) && Tensor_has_type p (tag (tensorTypes _ t)) && tensorProtoSized p}.
+Definition tensorNamed (t : TensorProto) : bool :=
+  match t with
+  | TensorProto_constructor _ _ _ _ _ _ _ s _ _ _ _ _ _ _ => s
+  end.
+
+Definition sized_tensor : eqType :=
+  { p : qTensor | tensorProtoSized p && tensorNamed p}.
+
+Definition well_formed_tensor (t : TensorType Elem) : eqType :=
+  { p : sized_tensor | dims_match (val p) (tensorDims _ t)
+                       && Tensor_has_type (val p) (tag (tensorTypes _ t))}.
 
 Definition tensor_dtype (t : TensorProto) : option DataType_TensorProto :=
   let: TensorProto_constructor _ ty _ _ _ _ _ _ _ _ _ _ _ _ _ := t in
@@ -2685,7 +2694,7 @@ have in_sh : forall i, i \in inputs -> forall nm u, value_name i = Some nm -> u 
   rewrite mem_cat iin E => /(_ isT); case: (value_dims i) => // ds /andP [_ /eqP e].
   by move=> /allP /(_ u ux); rewrite hn /= -e => /eqP [].
 move=> {v_sh xs_sh i_sh decl init_ok xdt}.
-have {in_one} in_one : all (fun i => if value_name i is Some nm then
+have {}in_one : all (fun i => if value_name i is Some nm then
     size (filter (tensor_has_name nm) xs) == 1%nat else false) inputs := in_one.
 rewrite /value_name.
 case: x x0 xis xin => [[xname|//]] xtype xstring xmeta /[dup] /= x' x'' -> xin'.

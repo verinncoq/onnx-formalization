@@ -43,12 +43,13 @@ Lemma prod_tnth (s : seq nat) :
   \prod_(i < size s) tnth (in_tuple s) i = \prod_(x <- s) x.
 Proof. by rewrite [RHS]big_tnth. Qed.
 
+(** Function from qTensor + predicates into mathcomp tensor **)
 Definition theoryTensorProto : forall t : TensorType (ElementType syntax_inst), TheoryTensor syntax_inst t -> TensorSemantics denote t.
 Proof.
 rewrite /TheoryTensor.
 rewrite /=.
 case.
-case => /= [x H] [k dims] [t /= /andP [/andP [Ht hasType] sized]].
+case => /= [x H] [k dims] [[t /andP [sized _]] /= /andP [Ht hasType]].
 case: t Ht hasType sized => /= t Ht Ht'.
 rewrite /Tensor_has_type /tensorProtoSized.
 move: Ht'.
@@ -394,13 +395,21 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
       case Etn: tn tsh => [s|] //= /andP [dc /eqP sh] T.
       exact: (to_mat _ s _ shape dims shapeE dc sh T).
     apply: theoryTensorProto.
-    exists (qtensor_pi (TensorProto_constructor dims (Some dt) seg fd i32 sd i64 tn
-                                                ds rd ed dl dd u64 mp)).
+    have tnamed : tn by move: tsh; destruct tn.
+    pose q := qtensor_pi (TensorProto_constructor dims (Some dt) seg fd i32 sd i64 tn
+                                                  ds rd ed dl dd u64 mp).
+    have qsized : tensorProtoSized q && tensorNamed q.
+      rewrite /q /= /storage_of.
+      case: x E Hsize xin => // E Hsize xin;
+        [have HZ := DataType_float E | have HZ := DataType_int32 E | have HZ := DataType_int64 E];
+        by rewrite HZ /= E Hsize dpos /=.
+    exists (exist _ q qsized).
+    rewrite /= /q {qsized q tnamed}.
     have Edims : dims = map (tnth (in_tuple dims)) (fintype.enum 'I_(size dims)).
       by rewrite map_tnth_enum.
     case: x E Hsize xin => // E Hsize xin;
       [move: (DataType_float E) | move: (DataType_int32 E) | move: (DataType_int64 E)] => Z;
-      rewrite /= /storage_of Z /= E eqxx Hsize dpos /= !andbT;
+      rewrite /= /storage_of Z /= E eqxx /= !andbT;
       rewrite -map_comp; apply/eqP;
       rewrite {1}Edims;
       by rewrite -map_comp enumT; apply: eq_map => i /=; rewrite ffunE insubdK //; exact: pos i.
@@ -449,12 +458,6 @@ rewrite dE /=; apply: (reshape _ Y).
 have /andP [h0 w0] := mat_dims_pos _ dc.
 by rewrite (dims_prodE _ _ _ (esym odims) dc) /= /shn sh mat_prod.
 Defined.
-
-(* the two are genuine inverses: encoding then decoding always recovers
-   the original constructor *)
-Lemma DataType_TensorProto_int32_roundtrip (x : DataType_TensorProto) :
-  DataType_TensorProto_of_int32 (int32_of_DataType_TensorProto x) = Some x.
-Proof. by case: x. Qed.
 
 Definition TensorProto_le (d : TensorType (ElementType syntax_inst)) : TensorComp denote d.
 Proof.

@@ -425,7 +425,7 @@ end.
 Definition syntax_inst : NetworkTheorySyntax :=
   {|
       ElementType := Elem;
-      TheoryTensor := sized_tensor;
+      TheoryTensor := well_formed_tensor;
       Model := well_formed_model;
       NodeOutputName := string;
       NodeOutput := nodeOutput;

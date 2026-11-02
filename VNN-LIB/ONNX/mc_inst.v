@@ -851,8 +851,8 @@ HB.instance Definition _ := hasDecEq.Build vertex vertexEqP.
 
 (** A TensorProto carries one data field per storage class, but only the one
  selected by its data_type enum is meaningful. Two TensorProtos are identified
- when they have the same data_type and agree on that field; all other fields
- are ignored. The mapping from data_type to field follows onnx.proto. **)
+ when they have the same dims, data_type and name and agree on that field;
+ all other fields are ignored. The mapping from data_type to field follows onnx.proto. **)
 
 Inductive tensor_storage :=
 | FloatStorage   (* float_data:  FLOAT, COMPLEX64 *)
@@ -880,13 +880,13 @@ Definition storage_of (data_type : option int32) : tensor_storage :=
       end
   end.
 
-(** Canonical representative: keep data_type and the field it selects, and
- reset every other field to its default. **)
+(** Canonical representative: keep dims, data_type, name and the data field
+ data_type selects, and reset every other field to its default. **)
 Definition canon_tensor (t : TensorProto) : TensorProto :=
   match t with
-  | TensorProto_constructor dims dt _ fd i32d sd i64d _ _ _ _ _ dd u64d _ =>
+  | TensorProto_constructor dims dt _ fd i32d sd i64d name _ _ _ _ dd u64d _ =>
       let mk fd i32d sd i64d dd u64d :=
-        TensorProto_constructor dims dt None fd i32d sd i64d None None None nil None dd u64d nil in
+        TensorProto_constructor dims dt None fd i32d sd i64d name None None nil None dd u64d nil in
       match storage_of dt with
       | FloatStorage  => mk fd  nil  nil nil  nil nil
       | Int32Storage  => mk nil i32d nil nil  nil nil
