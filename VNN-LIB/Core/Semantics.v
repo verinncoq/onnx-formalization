@@ -1,4 +1,5 @@
-From mathcomp Require Import all_boot all_algebra all_order.
+Set Warnings "-notation-overridden,-ambiguous-paths".
+From mathcomp Require Import boot algebra order.
 From mathcomp Require Import interval_inference tensor.
 From ONNXFormalization.VNNLIB.ONNX Require Import Syntax Semantics.
 From ONNXFormalization.VNNLIB.Core Require Import Syntax.
