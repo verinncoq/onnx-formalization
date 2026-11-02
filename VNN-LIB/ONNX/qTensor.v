@@ -1,6 +1,7 @@
+Set Warnings "-notation-overridden,-ambiguous-paths".
 From ONNXFormalization.ONNXConverter Require Import model.
 
-From mathcomp Require Import all_boot all_algebra all_order.
+From mathcomp Require Import boot algebra order.
 From mathcomp Require Import interval_inference.
 From HB Require Import structures.
 From Stdlib Require Import Strings.String.
@@ -86,7 +87,9 @@ Record qTensor := QTensor {
   _ : canon_tensor qtensor_val == qtensor_val
 }.
 
+#[warnings="-projection-no-head-constant,-redundant-canonical-projection"]
 HB.instance Definition _ := [isSub for qtensor_val].
+#[warnings="-redundant-canonical-projection"]
 HB.instance Definition _ := [Equality of qTensor by <:].
 
 Definition qtensor_pi (t : TensorProto) : qTensor :=

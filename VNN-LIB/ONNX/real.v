@@ -1,3 +1,5 @@
+Set Warnings "-notation-overridden,-ambiguous-paths".
+Set Warnings "-deprecated-notation-since-mathcomp-2.6.0-experimental-tensor".
 From ONNXFormalization.VNNLIB.ONNX Require Import Syntax Semantics.
 
 From mathcomp Require Import boot algebra order reals.
@@ -223,7 +225,7 @@ Definition realSyntax : NetworkTheorySyntax :=
 Definition realElementTypeInterp (real : RealElementType) : eqType := R.
 
 Definition RealNetworkSemantics : Type :=
-  forall {y1 y2 d1 d2 u} (m : Model n y1), NetworkShapesMatch y1 y2 ->
+  forall y1 y2 d1 d2 u (m : Model n y1), NetworkShapesMatch y1 y2 ->
                                         InputSemantics realElementTypeInterp y2 ->
                                         NodeOutput n m u d1 ->
                                         TensorShapesMatch d1 d2 ->
@@ -281,9 +283,11 @@ Proof.
   apply/forallP=> ij; exact /le_trans.
 Qed.
 
+#[warnings="-redundant-canonical-projection"]
 HB.instance Definition _ := Order.isPOrder.Build
                               d 'T[T]_(u_, d_) lt_t_def le_t_refl le_t_anti le_t_trans.
 
+#[warnings="-redundant-canonical-projection"]
 End TensorPOrder.
 
 Definition tensor_le (d : TensorType (ElementType realSyntax))
@@ -356,4 +360,5 @@ Definition realSemantics (realNetworkSemantics : RealNetworkSemantics)
     tensor_add
     tensor_mul.
 
+#[warnings="-redundant-canonical-projection"]
 End RealSyntax.

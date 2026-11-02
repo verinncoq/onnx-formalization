@@ -1,6 +1,7 @@
+Set Warnings "-notation-overridden,-ambiguous-paths".
 From ONNXFormalization.ONNXConverter Require Import model.
 
-From mathcomp Require Import all_boot all_algebra all_order.
+From mathcomp Require Import boot algebra order.
 From mathcomp Require Import interval_inference.
 From HB Require Import structures.
 From Stdlib Require Import Strings.String.
@@ -71,8 +72,10 @@ apply: (iffP idP) => [H | ->].
 by rewrite byte_dec_lb.
 Qed.
 
+#[warnings="-redundant-canonical-projection"]
 HB.instance Definition _ := hasDecEq.Build byte byteEqP.
 
+#[warnings="-redundant-canonical-projection"]
 HB.instance Definition _ := Choice.copy byte (pcan_type Byte.of_to_nat).
 
 Fact byte_display : Order.disp_t.
@@ -115,12 +118,14 @@ move=> x y z y_le_x x_le_z.
 by apply/(le_trans y_le_x).
 Qed.
 
+#[warnings="-redundant-canonical-projection"]
 HB.instance Definition _ := Order.isPreorder.Build byte_display
                                                byte
                                                byte_lt_def
                                                byte_refl
                                                byte_le_trans.
 
+#[warnings="-redundant-canonical-projection"]
 End Byte.
 
 Section Binary.
@@ -161,7 +166,7 @@ apply: (iffP idP).
    move=> /andP [/eqP -> /Peqb_true_eq H].
    move: H e e' => -> e e'.
    by rewrite (bool_irrelevance e e').
- - move=> s pl e x s' pl' e' x' /= /andP [/andP [/eqP ->]] /Peqb_true_eq H /Zeq_bool_eq H'.
+ - move=> s pl e x s' pl' e' x' /= /andP [/andP [/eqP ->]] /Peqb_true_eq H /Z.eqb_eq H'.
    move: x x'.
    rewrite !H' => x x'.
    move: e e' x x' {H'}.
@@ -915,7 +920,9 @@ Record qTensor := QTensor {
   _ : canon_tensor qtensor_val == qtensor_val
 }.
 
+#[warnings="-projection-no-head-constant,-redundant-canonical-projection"]
 HB.instance Definition _ := [isSub for qtensor_val].
+#[warnings="-redundant-canonical-projection"]
 HB.instance Definition _ := [Equality of qTensor by <:].
 
 Definition qtensor_pi (t : TensorProto) : qTensor :=

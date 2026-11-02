@@ -1,4 +1,5 @@
-From mathcomp Require Import all_boot all_algebra all_order.
+Set Warnings "-notation-overridden,-ambiguous-paths".
+From mathcomp Require Import boot algebra order.
 From mathcomp Require Import interval_inference.
 From HB Require Import structures.
 Open Scope ring_scope.
@@ -111,6 +112,7 @@ Definition NetworkTypesMatch {Types : eqType} (y1 : NetworkType Types)
 
 Definition tseq_sub {ElementType : eqType} (s : seq (TensorType ElementType)) := seq_sub s.
 
+#[warnings="-redundant-canonical-projection"]
 HB.instance Definition _ {ElementType : eqType} (s : seq (TensorType ElementType)) :=
   Finite.copy (tseq_sub s) (adhoc_seq_sub_finType s).
 
@@ -132,4 +134,5 @@ move: H m1 m2 => /eqP ->.
 exact: eq_op.
 Qed.
 
+#[warnings="-redundant-canonical-projection"]
 End Syntax.

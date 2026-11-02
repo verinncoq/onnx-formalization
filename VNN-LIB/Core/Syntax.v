@@ -1,7 +1,8 @@
+Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import boot algebra order.
 From mathcomp Require Import interval_inference tensor.
 From HB Require Import structures.
-From Stdlib Require Import Strings.String.
+From Stdlib Require Import Strings.String JMeq.
 From ONNXFormalization.VNNLIB.ONNX Require Import Syntax.
 
 Open Scope ring_scope.
@@ -11,6 +12,7 @@ HB.instance Definition _ := hasDecEq.Build string String.eqb_spec.
 
 Definition Name : Set := string.
 Identity Coercion Name_to_string : Name >-> string.
+#[warnings="-redundant-canonical-projection"]
 HB.instance Definition _ := Equality.copy Name string.
 
 Section Decls.
@@ -423,8 +425,6 @@ Definition ModelsIsomorphic {name : Name} {d1 d2 : NetworkDeclaration}
   (current : NetworkImplementation d1)
   (pair : NetworkImplementation d2 * ValidIsomorphicToTarget name d1 d2)
   : bool := iso n (model d1 current) (targetShapesMatch _ _ _ pair.2) (model d2 (fst pair)).
-
-From Stdlib Require Import JMeq.
 
 Lemma in_cons_tail {x d : NetworkDeclaration} {xs : seq NetworkDeclaration} :
   x != d -> d \in x :: xs -> d \in xs.

@@ -1,3 +1,4 @@
+Set Warnings "-notation-overridden,-ambiguous-paths".
 From ONNXFormalization.ONNXConverter Require Import model.
 
 From mathcomp Require Import boot algebra order reals Rstruct.
