@@ -274,35 +274,46 @@ Definition int64_is_zero (i: int64) : bool :=
   end.
 
 (*
-Returns a NNPremodel_Linear if the input list has exactly three inputs and the output list has exaclty one output.
+Returns a NNPremodel_Linear if the input list has two or three inputs and the output list has exaclty one output.
+The third input (bias C) is optional in ONNX: for two inputs, the bias is None (the bias term is zero).
 Also, it reads the attributes. If alpha is not 1 or transA is not 0, an error is returned,
 because this are the limits of the verification model.
 *)
 Definition convert_NodeProto_Gemm_to_NNPremodel (outputs inputs: list string) (attributes: list AttributeProto) : error_option NNPremodel :=
   match outputs with
   | out::[] => match inputs with
-    | inp::weight::bias::[] =>
-      let alpha := match get_float_attribute attributes "alpha" with
-      | Success a => a
-      | Error _ => default_one
-      end in
-      let beta := match get_float_attribute attributes "beta" with
-      | Success b => b
-      | Error _ => default_one
-      end in
-      let transA := match get_int_attribute attributes "transA" with
-      | Success ta => ta
-      | Error _ => default_zero
-      end in
-      let transB := match get_int_attribute attributes "transB" with
-      | Success tb => tb
-      | Error _ => default_zero
-      end in
-      match (float32_is_one alpha), (int64_is_zero transA) with
-      | true, true => Success (NNPremodel_Linear inp out weight bias (string_of_int64 transB) (string_of_float32 beta))
-      | _, _ => Error "Attribute alpha of gemm operation must be 1 or None AND attribute transA of gemm operation be 0 or None"
+    | inp::weight::tail =>
+      let bias_option := match tail with
+                         | bias::[] => Success (Some bias)
+                         | [] => Success None
+                         | _ => Error "Gemm node must have two or three inputs"
+                         end in
+      match bias_option with
+      | Success bias =>
+        let alpha := match get_float_attribute attributes "alpha" with
+        | Success a => a
+        | Error _ => default_one
+        end in
+        let beta := match get_float_attribute attributes "beta" with
+        | Success b => b
+        | Error _ => default_one
+        end in
+        let transA := match get_int_attribute attributes "transA" with
+        | Success ta => ta
+        | Error _ => default_zero
+        end in
+        let transB := match get_int_attribute attributes "transB" with
+        | Success tb => tb
+        | Error _ => default_zero
+        end in
+        match (float32_is_one alpha), (int64_is_zero transA) with
+        | true, true => Success (NNPremodel_Linear inp out weight bias (string_of_int64 transB) (string_of_float32 beta))
+        | _, _ => Error "Attribute alpha of gemm operation must be 1 or None AND attribute transA of gemm operation be 0 or None"
+        end
+      | Error e => Error e
       end
-    | _ => Error "Gemm node must have exaclty three inputs"
+    | [_] => Error "Gemm node must have two or three inputs"
+    | [] => Error "Gemm node must have two or three inputs"
     end
   | _ => Error "Gemm node must have exaclty one output"
   end.

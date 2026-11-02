@@ -26,28 +26,114 @@ Fixpoint split_at_dot (s buffer: string): (string * string) :=
             end
   end.
 
+(*returns a string consisting of 'times' times the character "0"*)
+Fixpoint zeros (times: nat) : string :=
+  match times with
+  | O => EmptyString
+  | S n => String "0"%char (zeros n)
+  end.
+
+(*takes the first n elements of a list*)
+Fixpoint take_ascii (n: nat) (l: list ascii) : list ascii :=
+  match n with
+  | O => []
+  | S n' => match l with
+    | [] => []
+    | a::l' => a :: take_ascii n' l'
+    end
+  end.
+
+(*drops the first n elements of a list*)
+Fixpoint drop_ascii (n: nat) (l: list ascii) : list ascii :=
+  match n with
+  | O => l
+  | S n' => match l with
+    | [] => []
+    | _::l' => drop_ascii n' l'
+    end
+  end.
+
+(*splits a string at the first exponent marker 'e' or 'E'; the second component is EmptyString if there is none*)
+Fixpoint split_at_e (s buffer: string): (string * string) :=
+  match s with
+  | EmptyString => (buffer, EmptyString)
+  | String a s' => match a with
+            | "e"%char => (buffer, s')
+            | "E"%char => (buffer, s')
+            | _ => split_at_e s' (String.append buffer (String a EmptyString))
+            end
+  end.
+
+(*like Z_of_string, but additionally allows a leading '+' (as in the exponent of "1e+30")*)
+Definition Z_of_exponent_string (s: list ascii) : option Z :=
+  match s with
+  | "+"%char :: rest => Z_of_string rest
+  | _ => Z_of_string s
+  end.
+
+(*
+Rewrites a mantissa string m and a decimal exponent e into a plain decimal string
+by moving the dot of m e places to the right (e may be negative).
+Example: ("1.5", -3) gives "0.0015"; ("1", 30) gives "1" followed by 30 zeros and ".0".
+*)
+Definition shift_decimal_dot (m: string) (e: Z) : string :=
+  let (before, after) := split_at_dot m "" in
+  let digits := String.append before after in
+  let d := list_ascii_of_string digits in
+  let n := length d in
+  let p := Z.of_nat (length (list_ascii_of_string before)) + e in
+  if p <=? 0 then
+    String.append (String.append "0."%string (zeros (Z.to_nat (-p)))) digits
+  else if p <? Z.of_nat n then
+    String.append (String.append (string_of_list_ascii (take_ascii (Z.to_nat p) d)) "."%string) (string_of_list_ascii (drop_ascii (Z.to_nat p) d))
+  else
+    String.append (String.append digits (zeros (Z.to_nat (p - Z.of_nat n)))) ".0"%string.
+
+(*
+Rewrites exponent notation (e.g. "1.5e-3" or "1E+30") into plain decimal notation (e.g. "0.0015").
+Returns None if an exponent marker is present but the exponent is not a valid integer.
+*)
+Definition normalize_exponent (s: string) : option string :=
+  let (m, e) := split_at_e s "" in
+  match e with
+  | EmptyString => Some s
+  | _ => match m with
+    | EmptyString => None
+    | _ => match Z_of_exponent_string (list_ascii_of_string e) with
+      | Some ez => Some (shift_decimal_dot m ez)
+      | None => None
+      end
+    end
+  end.
+
 (*
 Splits a string representing a float into four parts:
 1. The sign (- true; + false)
 2. The part before the dot as a Z
 3. The part after the dot as a Z
 4. The amout of digits used to represent the part after the dot in the input
+Exponent notation (e.g. "1e-05", "1e+30") is first rewritten into plain decimal notation.
 *)
 Definition decompose_float_string (s: string) : option (bool * Z * Z * nat) :=
   match s with
   | EmptyString => None
   | String a s' => let (sign, rest) := match a with
     | "-"%char => (true, s')
+    | "+"%char => (false, s')
     | _ => (false, s)
     end in
-    let (before, after) := split_at_dot rest "" in
-    match Z_of_string (list_ascii_of_string before) with
-    | Some before_nat => match Z_of_string (list_ascii_of_string after) with
-      | Some after_nat => 
-      Some (sign, before_nat, after_nat, length (list_ascii_of_string after))
+    match normalize_exponent rest with
+    | None => None
+    | Some rest' =>
+      let (before, after) := split_at_dot rest' "" in
+      match Z_of_string (list_ascii_of_string before) with
+      | Some before_nat => match Z_of_string (list_ascii_of_string after) with
+        | Some after_nat =>
+        Some (sign, before_nat, after_nat, length (list_ascii_of_string after))
+        | None => None
+        end
       | None => None
       end
-    | None => None
     end
   end.
 
@@ -238,13 +324,6 @@ Fixpoint move_dot_right (times: nat) (before after: list bool) : (list bool * li
 
 Open Scope string_scope.
 
-(*returns a string consisting of 'times' times the character "0"*)
-Fixpoint zeros (times: nat) : string :=
-  match times with
-  | O => EmptyString
-  | S n => String "0"%char (zeros n)
-  end.
-
 (*returns a string consisting of (expected_len - result_len) times the character "0"*)
 Definition missing_zeros (result_len expected_len: N) : string :=
   match (Z.of_N expected_len) - (Z.of_N result_len) with
@@ -314,44 +393,96 @@ Definition float32 := binary32.
 Definition float64 := binary64.
 
 
+(*lowercase version of an ascii character (only 'A'-'Z' are changed)*)
+Definition ascii_lower (a: ascii) : ascii :=
+  let n := Ascii.nat_of_ascii a in
+  Ascii.ascii_of_nat (if andb (Nat.leb 65 n) (Nat.leb n 90) then Nat.add n 32 else n).
+
+(*lowercase version of a string*)
+Fixpoint string_lower (s: string) : string :=
+  match s with
+  | EmptyString => EmptyString
+  | String a s' => String (ascii_lower a) (string_lower s')
+  end.
+
+(*
+Recognizes the special float values "inf", "infinity" and "nan" (case-insensitive, with optional sign).
+Returns Some (is_nan, sign), where is_nan = true means nan and is_nan = false means infinity.
+*)
+Definition special_float_string (s: string) : option (bool * bool) :=
+  let (sign, rest) := match s with
+    | String a s' => match a with
+      | "-"%char => (true, s')
+      | "+"%char => (false, s')
+      | _ => (false, s)
+      end
+    | EmptyString => (false, s)
+    end in
+  let r := string_lower rest in
+  if string_dec r "nan"%string then Some (true, sign)
+  else if string_dec r "inf"%string then Some (false, sign)
+  else if string_dec r "infinity"%string then Some (false, sign)
+  else None.
+
+
 (*Converters*)
 
 (*
 Converts a string representing a float into a float32.
 If the float32 type cannot represent the float, it is rounded to the nearest value.
 We choose the depth parameter to be 161 because it is the maximum exponent for the float32 type plus the amount of bits plus one.
+Exponent notation (e.g. "1e-05", "1e+30") and the special values "inf"/"nan" (case-insensitive, with optional sign) are accepted.
+The sign is applied via b32_opp after normalization and is NOT passed to binary_normalize as the zero sign,
+so that "-0" is correctly parsed as negative zero.
 *)
 Definition float32_of_string (s: list ascii) : option float32 :=
-  match string_to_float_decomposition 161 (string_of_list_ascii s) with
-  | Some tuple =>
-    let sign := (fst (fst tuple)) in
-    let mantissa := (snd (fst tuple)) in
-    let exponent := (snd tuple) in
-    let bin := Binary.binary_normalize 24 128 eq_refl eq_refl mode_NE mantissa exponent sign in
-    match sign with
-    | false => Some bin
-    | true => Some (b32_opp bin)
+  let str := string_of_list_ascii s in
+  match special_float_string str with
+  | Some (is_nan, sign) =>
+    if is_nan then Some (proj1_sig default_nan_pl32)
+    else Some (@Binary.B754_infinity 24 128 sign)
+  | None =>
+    match string_to_float_decomposition 161 str with
+    | Some tuple =>
+      let sign := (fst (fst tuple)) in
+      let mantissa := (snd (fst tuple)) in
+      let exponent := (snd tuple) in
+      let bin := Binary.binary_normalize 24 128 eq_refl eq_refl mode_NE mantissa exponent false in
+      match sign with
+      | false => Some bin
+      | true => Some (b32_opp bin)
+      end
+    | None => None
     end
-  | None => None
   end.
 
 (*
 Converts a string representing a float into a float64.
 If the float64 type cannot represent the float, it is rounded to the nearest value.
 We choose the depth parameter to be 1088 because it is the maximum exponent for the float64 type plus the amount of bits plus one.
+Exponent notation (e.g. "1e-05", "1e+30") and the special values "inf"/"nan" (case-insensitive, with optional sign) are accepted.
+The sign is applied via b64_opp after normalization and is NOT passed to binary_normalize as the zero sign,
+so that "-0" is correctly parsed as negative zero.
 *)
 Definition float64_of_string (s: list ascii) : option float64 :=
-  match string_to_float_decomposition 1088 (string_of_list_ascii s) with
-  | Some tuple =>
-    let sign := (fst (fst tuple)) in
-    let mantissa := (snd (fst tuple)) in
-    let exponent := (snd tuple) in
-    let bin := Binary.binary_normalize 53 1024 eq_refl eq_refl mode_NE mantissa exponent sign in
-    match sign with
-    | false => Some bin
-    | true => Some (b64_opp bin)
+  let str := string_of_list_ascii s in
+  match special_float_string str with
+  | Some (is_nan, sign) =>
+    if is_nan then Some (proj1_sig default_nan_pl64)
+    else Some (@Binary.B754_infinity 53 1024 sign)
+  | None =>
+    match string_to_float_decomposition 1088 str with
+    | Some tuple =>
+      let sign := (fst (fst tuple)) in
+      let mantissa := (snd (fst tuple)) in
+      let exponent := (snd tuple) in
+      let bin := Binary.binary_normalize 53 1024 eq_refl eq_refl mode_NE mantissa exponent false in
+      match sign with
+      | false => Some bin
+      | true => Some (b64_opp bin)
+      end
+    | None => None
     end
-  | None => None
   end.
 
 (*
@@ -359,11 +490,12 @@ Converts a float32 into a string representing the float.
 We choose the depth parameter the be 128 because it is always
 greater than the binary representation of the mantissa (float32 uses a 32 bits)
 and allways greater than the amount of characters used to represent the float.
+The sign of zero and infinity is preserved ("-0", "-Inf").
 *)
 Definition string_of_float32 (f: float32) : string :=
   match f with
-  | Binary.B754_zero _ _ _ => "0"
-  | Binary.B754_infinity _ _ _ => "Inf"
+  | Binary.B754_zero _ _ sign => if sign then "-0" else "0"
+  | Binary.B754_infinity _ _ sign => if sign then "-Inf" else "Inf"
   | Binary.B754_nan _ _ _ _ _ => "NaN"
   | Binary.B754_finite _ _ sign mantissa exponent _ =>
     match float_decomposition_to_string 128 sign exponent (Zpos mantissa) with
@@ -377,11 +509,12 @@ Converts a float64 into a string representing the float.
 We choose the depth parameter the be 1024 because it is always
 greater than the binary representation of the mantissa (float64 uses a 64 bits)
 and allways greater than the amount of characters used to represent the float.
+The sign of zero and infinity is preserved ("-0", "-Inf").
 *)
 Definition string_of_float64 (f: float64) : string :=
   match f with
-  | Binary.B754_zero _ _ _ => "0"
-  | Binary.B754_infinity _ _ _ => "Inf"
+  | Binary.B754_zero _ _ sign => if sign then "-0" else "0"
+  | Binary.B754_infinity _ _ sign => if sign then "-Inf" else "Inf"
   | Binary.B754_nan _ _ _ _ _ => "NaN"
   | Binary.B754_finite _ _ sign mantissa exponent _ =>
     match float_decomposition_to_string 1024 sign exponent (Zpos mantissa) with
