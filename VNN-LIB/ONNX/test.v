@@ -78,7 +78,7 @@ Definition g : GraphProto :=
 Definition model : ModelProto :=
   ModelProto_constructor None nil None None None None None (Some g) nil nil nil nil.
 
-Compute (onnx_evaluator model).
+(* Compute (onnx_evaluator model). *)
 
 Definition x : TensorProto :=
   TensorProto_constructor [:: int64_of_Z 1; int64_of_Z 2] (Some (int32_of_Z 1)) None [:: f32 (-1); f32 2] nil nil nil (Some """x"""%string) None None nil None nil nil nil.
@@ -109,7 +109,16 @@ Definition toy_dnn (x : TensorProto) : error_option TensorProto :=
   let W1 := TensorProto_constructor [:: int64_of_Z 2; int64_of_Z 2] (Some (int32_of_Z 1)) None [:: f32 2; f32 1; f32 (-1); f32 1] nil nil nil (Some """W1"""%string) None None nil None nil nil nil in
   let W2 := TensorProto_constructor [:: int64_of_Z 1; int64_of_Z 2] (Some (int32_of_Z 1)) None [:: f32 (-1); f32 2] nil nil nil (Some """W2"""%string) None None nil None nil nil nil in
   emap tensor_of_matrix_float32 (ebind (emap (map (map relu_float32)) (ebind (matrix_float32_of_tensor x) (fun x =>
-                                         ebind (matrix_float32_of_tensor W1) (fun y => gemm_float32 x y [:: [:: f32 0]] (f32 1) (f32 1) (int64_of_Z 0) (int64_of_Z 1) [::])))) (fun x => ebind (matrix_float32_of_tensor W2) (fun y => gemm_float32 x y [:: [:: f32 0]] (f32 1) (f32 1) (int64_of_Z 0) (int64_of_Z 1) [::]))).
+                                                                                                             ebind (matrix_float32_of_tensor W1) (fun y => gemm_float32 x y [:: [:: f32 0]] (f32 1) (f32 1) (int64_of_Z 0) (int64_of_Z 1) [::])))) (fun x => ebind (matrix_float32_of_tensor W2) (fun y => gemm_float32 x y [:: [:: f32 0]] (f32 1) (f32 1) (int64_of_Z 0) (int64_of_Z 1) [::]))).
+
+Definition toy_dnn' {R : numFieldType}
+  (x : 'nT[R]_([tuple 1%:posnat; 2%:posnat]))
+  : 'nT[R]_([tuple 1%:posnat; 1%:posnat]) :=
+  let W1 := \matrix_(i < 2, j < 2) nth 0%R (nth [::] [:: [:: 2%R; 1%R]; [:: -1; 1]]%R i) j in
+  let W2 := \matrix_(i < 1, j < 2) nth 0%R [:: -1; 2]%R i in
+    (map_mx (fun x => if 0%R < x then x else 0%R) (x *m W1^T)) *m W2^T.
+
+
 
 (* Lemma result (x : sized_tensor) : *)
 (*   forall x', (matrix_float32_of_tensor (val x)) = Success x' -> *)
