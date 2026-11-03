@@ -40,9 +40,6 @@ end.
 
 (* TODO: data_type is a reference to the enum DataType_TensorProto, so there
 should be a check these match *)
-Lemma prod_tnth (s : seq nat) :
-  \prod_(i < size s) tnth (in_tuple s) i = \prod_(x <- s) x.
-Proof. by rewrite [RHS]big_tnth. Qed.
 
 (** Function from qTensor + predicates into mathcomp tensor **)
 Definition theoryTensorProto : forall t : TensorType (ElementType syntax_inst), TheoryTensor syntax_inst t -> TensorSemantics denote t.
@@ -64,7 +61,7 @@ case: x H => // _ dims_eq /eqP <- /andP [dims_pos /eqP data_sized].
 - apply: Tensor. rewrite big_ord0.
   apply: (\col_(i < \prod_(i < k) (dims i)%:posnum) tnth (in_tuple float) (cast_ord _ i)).
   move=> _ _.
-  rewrite data_sized /dims_prod /= (big_nth default_zero) big_mkord.
+  rewrite data_sized dims_prodE /= (big_nth default_zero) big_mkord.
   move: (f_equal size dims_eq).
   rewrite !size_map /= -enumT size_enum_ord => /[dup] Hk ->.
   apply/eq_bigr => i _.
@@ -76,7 +73,7 @@ case: x H => // _ dims_eq /eqP <- /andP [dims_pos /eqP data_sized].
 - apply: Tensor; rewrite big_ord0.
   apply: (\col_(i < \prod_(i < k) (dims i)%:posnum) tnth (in_tuple int32) (cast_ord _ i)).
   move=> _ _.
-  rewrite data_sized /dims_prod /= (big_nth default_zero) big_mkord.
+  rewrite data_sized dims_prodE /= (big_nth default_zero) big_mkord.
   move: (f_equal size dims_eq).
   rewrite !size_map /= -enumT size_enum_ord => /[dup] Hk ->.
   apply/eq_bigr => i _.
@@ -88,7 +85,7 @@ case: x H => // _ dims_eq /eqP <- /andP [dims_pos /eqP data_sized].
 - apply: Tensor; rewrite big_ord0.
   apply: (\col_(i < \prod_(i < k) (dims i)%:posnum) tnth (in_tuple int64) (cast_ord _ i)).
   move=> _ _.
-  rewrite data_sized /dims_prod /= (big_nth default_zero) big_mkord.
+  rewrite data_sized dims_prodE /= (big_nth default_zero) big_mkord.
   move: (f_equal size dims_eq).
   rewrite !size_map /= -enumT size_enum_ord => /[dup] Hk ->.
   apply/eq_bigr => i _.
@@ -147,16 +144,13 @@ move=> /and3P [/allP nodes_ok /allP v_sh /allP i_sh].
 have vop n : node n \in vertices -> valid_op n.
   by rewrite -Hv mem_graph_items_node => /nodes_ok /andP [/node_dims_ok_valid_op].
 have sized t : tensor t \in vertices -> tensorProtoSized t.
-  by rewrite -Hv mem_graph_items_tensor => /init_ok /and3P [].
-have named i : input i \in vertices -> value_name i != None.
-  rewrite -Hv mem_graph_items_input => iin.
-  by move: (decl i); rewrite mem_cat iin => /(_ isT) /and4P [].
+  by rewrite -Hv mem_graph_items_tensor => /init_ok /andP [].
 have in_inputs i : input i \in vertices -> i \in inputs.
   by rewrite -Hv mem_graph_items_input.
 have no_output v : output v \in vertices = false.
   by rewrite -Hv output_notin_graph_items.
 have Hsz : size inps = size inputs.
-  by move/and4P: dm => [_ _ + _]; rewrite all2E => /andP [/eqP].
+  by move/andP: dm => [+ _]; rewrite all2E => /andP [/eqP].
 (** every vertex has the tensor type of its name's declared dims, in the dtype of d **)
 pose shn := name_dims initialisers (inputs ++ outputs ++ value_info)%SEQ.
 pose ty (w : vertex) := @tensorType Elem (tensorTypes _ d)
@@ -166,7 +160,7 @@ have nodes_sh : all (node_dims_ok shn) nodes.
 (** the graph dtype is the dtype of d **)
 have dtE : (if outputs is o' :: _ then value_tensor_type o' else None) =
            Some (tag (tensorTypes _ d)).
-  move: (decl o); rewrite mem_cat oin orbT => /(_ isT) /and4P [_ /eqP <- _ _].
+  move: (decl o); rewrite mem_cat oin orbT => /(_ isT) /andP [_ /eqP <-].
   by case/andP: otype => /eqP.
 have elemE (x : Elem) : Some (tag x) = Some (tag (tensorTypes _ d)) -> x = tensorTypes _ d.
   by move=> [] /val_inj.
@@ -307,7 +301,7 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
   - (** Tensor: just return itself **)
     have tin : t \in initialisers by move: (sub _ win); rewrite -Hv mem_graph_items_tensor.
     have := sized t (sub _ win).
-    move: (init_ok t tin) (i_sh t tin) => /and3P [/eqP tdt _ _] tsh.
+    move: (init_ok t tin) (i_sh t tin) => /andP [/eqP tdt _] tsh.
     case: t win ac tin tdt tsh => dims [dt|] seg fd i32 sd i64 tn ds rd ed dl dd u64 mp
                                   win ac tin tdt tsh /andP [dpos] //.
     case E: (DataType_TensorProto_of_int32 dt) => [x|] // Hsize.
@@ -358,7 +352,7 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
     have ilt : (seq.index v inputs < size inps)%nat by rewrite Hsz index_mem.
     (** network_dim_match: the input at v's position has v's declared type **)
     have vt_ok : value_has_type (tnth (in_tuple inps) (Ordinal ilt)) v.
-      move/and4P: dm => [_ _ + _]; rewrite all2E => /andP [_ /all_nthP same].
+      move/andP: dm => [+ _]; rewrite all2E => /andP [_ /all_nthP same].
       have := same (tnth (in_tuple inps) (Ordinal ilt), v) (seq.index v inputs).
       rewrite nth_zip_cond size_zip -Hsz minnn ilt => /(_ isT) /=.
       by rewrite nth_index // -(tnth_nth _ (in_tuple inps) (Ordinal ilt)).
@@ -366,7 +360,7 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
     case: (tnth (in_tuple inps) (Ordinal ilt)) => ei [ki dsi] /= X /andP [/eqP vdt /eqP vdims].
     have eiE : ei = tensorTypes _ d.
       apply: elemE; rewrite -vdt -dtE.
-      by move: (decl v); rewrite mem_cat vin => /(_ isT) /and4P [_ /eqP].
+      by move: (decl v); rewrite mem_cat vin => /(_ isT) /andP [_ /eqP].
     (** X has the type of the input's declared dims **)
     move: (v_sh v) vdims; rewrite mem_cat vin => /(_ isT).
     rewrite /ty /vnames /= -eiE.

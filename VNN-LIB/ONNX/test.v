@@ -1,6 +1,7 @@
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From ONNXFormalization.ONNXConverter Require Import model.
 
+From Stdlib Require Import Rdefinitions.
 From mathcomp Require Import boot algebra order reals Rstruct.
 From mathcomp Require Import interval_inference.
 From HB Require Import structures.
@@ -115,10 +116,93 @@ Definition toy_dnn' {R : numFieldType}
   (x : 'nT[R]_([tuple 1%:posnat; 2%:posnat]))
   : 'nT[R]_([tuple 1%:posnat; 1%:posnat]) :=
   let W1 := \matrix_(i < 2, j < 2) nth 0%R (nth [::] [:: [:: 2%R; 1%R]; [:: -1; 1]]%R i) j in
-  let W2 := \matrix_(i < 1, j < 2) nth 0%R [:: -1; 2]%R i in
+  let W2 := \matrix_(i < 1, j < 2) nth 0%R [:: -1; 2]%R j in
     (map_mx (fun x => if 0%R < x then x else 0%R) (x *m W1^T)) *m W2^T.
 
+Definition networkType : NetworkType Elem :=
+  {|
+    inputs := exist (fun s => (0 < size s)%nat) [:: tensorType Elem (exist _ FLOAT_TensorProto isT) (existT (fun k => {posnum nat} ^ k)%type 2%N [ffun i : 'I_2 => tnth [:: 1%:posnat; 2%:posnat] i])] isT;
+    outputs := exist (fun s => (0 < size s)%nat) [:: tensorType _ (exist _ FLOAT_TensorProto isT) (existT (fun k => {posnum nat} ^ k)%type 2%N [ffun i : 'I_2 => tnth [:: 1%:posnat; 1%:posnat] i])] isT;
+  |}.
 
+Lemma network_dims_matches : network_dim_match model networkType.
+Proof.
+rewrite /network_dim_match /= !andbT.
+apply/andP; split; apply/andP; split => //; rewrite /omap /=; apply/eqP/f_equal;
+  (have -> : fintype.enum 'I_2 = [:: ord0; ord_max] by
+     apply: (inj_map val_inj); rewrite val_enum_ord);
+  by rewrite /= !ffunE.
+Qed.
+
+Lemma well_formed : model_well_formed model.
+Proof. vm_compute. reflexivity. Qed.
+
+Definition model' : well_formed_model networkType
+  := exist _ model
+       ([eta introTF (c:=true) andP] (conj network_dims_matches well_formed)).
+
+Program Definition seq1_head {T} (xs : seq1 T) : T :=
+match xs with
+| nil => _
+| cons x _ => x
+end.
+Next Obligation.
+move: xs Heq_xs.
+case.
+by case.
+Qed.
+
+Lemma idk : NodeOutput syntax_inst model' """y"""%string
+          (seq1_head (outputs Elem networkType)).
+Proof.
+rw /=.
+rw /model /graph_outputs /=.
+exists (ValueInfoProto_constructor (Some """y"""%string)
+                    (Some
+                       (TypeProto_constructor
+                          (Some
+                             (tensor_type_value_TypeProto
+                                (Tensor_TypeProto_constructor 
+                                   (Some (int32_of_Z 1))
+                                   (Some
+                                      (TensorShapeProto_constructor
+                                         [:: Dimension_TensorShapeProto_constructor
+                                               (Some
+                                                  (dim_value_value_Dimension_TensorShapeProto
+                                                     (int64_of_Z 1)))
+                                               None;
+                                             Dimension_TensorShapeProto_constructor
+                                               (Some
+                                                  (dim_value_value_Dimension_TensorShapeProto
+                                                     (int64_of_Z 1)))
+                                               None])))))
+                          None))
+                    None [::]).
+apply/and4P.
+split => //.
+rw /omap /=.
+apply/eqP/f_equal.
+have -> : fintype.enum 'I_2 = [:: ord0; ord_max].
+by apply: (inj_map val_inj); rewrite val_enum_ord.
+rewrite /= !ffunE /=.
+by [].
+Qed.
+
+Definition abc (x : InputSemantics (@realElementTypeInterp R)
+    {| inputs := exist (fun s => (0 < size s)%nat)
+         [:: tensorType RealElementType real (existT (fun k => {posnum nat} ^ k)%type 2%N [tuple 1%:posnat; 2%:posnat])] isT;
+       outputs := exist (fun s => (0 < size s)%nat)
+         [:: tensorType RealElementType real (existT (fun k => {posnum nat} ^ k)%type 2%N [tuple 1%:posnat; 1%:posnat])] isT |})
+  : 'nT[R]_([tuple 1%:posnat; 1%:posnat]).
+Proof.
+refine (realSemantics networkType _ (seq1_head (outputs _ networkType))
+    (tensorType RealElementType real (existT (fun k => {posnum nat} ^ k)%type 2%N [tuple 1%:posnat; 1%:posnat]))
+    """y"""%string model' _ x idk (eqxx _)).
+exact (introT andP (conj (introT andP (conj (eqxx _) isT)) (introT andP (conj (eqxx _) isT)))).
+Defined.
+
+Lemma abc_toy_dnn' x : abc x = toy_dnn' (x ord0).
+Admitted.
 
 (* Lemma result (x : sized_tensor) : *)
 (*   forall x', (matrix_float32_of_tensor (val x)) = Success x' -> *)

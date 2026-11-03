@@ -43,21 +43,18 @@ case: m dm wf oin => ir opset prod_name prod_vers domain model_version doc
 move: dm wf oin => /= dm wf oin.
 (** [vertices] of onnx_evaluator **)
 move Hv: (graph_items nodes inputs initialisers) => vertices.
-move/andP: wf => [/and4P [acyc /allP outs_one /allP decl /allP init_ok]].
+move/andP: wf => [/and4P [acyc /allP outs_one _ /allP init_ok]].
 move=> /and3P [/allP nodes_ok /allP v_sh /allP i_sh].
 have vop n : node n \in vertices -> valid_op n.
   by rewrite -Hv mem_graph_items_node => /nodes_ok /andP [/node_dims_ok_valid_op].
 have sized t : tensor t \in vertices -> tensorProtoSized t.
-  by rewrite -Hv mem_graph_items_tensor => /init_ok /and3P [].
-have named i : input i \in vertices -> value_name i != None.
-  rewrite -Hv mem_graph_items_input => iin.
-  by move: (decl i); rewrite mem_cat iin => /(_ isT) /and4P [].
+  by rewrite -Hv mem_graph_items_tensor => /init_ok /andP [].
 have in_inputs i : input i \in vertices -> i \in inputs.
   by rewrite -Hv mem_graph_items_input.
 have no_output v : output v \in vertices = false.
   by rewrite -Hv output_notin_graph_items.
 have Hsz : size inps = size inputs.
-  by move/and4P: dm => [_ _ + _]; rewrite all2E => /andP [/eqP].
+  by move/andP: dm => [+ _]; rewrite all2E => /andP [/eqP].
 have Hsz' : size inps' = size inps.
   by move: in_match; rewrite all2E => /andP [/eqP].
 (** every vertex has the real tensor type of its name's declared dims **)
@@ -241,7 +238,7 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
     have ilt' : (seq.index v inputs < size inps')%nat by rewrite Hsz'.
     (** network_dim_match: the input at v's position has v's declared type **)
     have vt_ok : value_has_type (tnth (in_tuple inps) (Ordinal ilt)) v.
-      move/and4P: dm => [_ _ + _]; rewrite all2E => /andP [_ /all_nthP same].
+      move/andP: dm => [+ _]; rewrite all2E => /andP [_ /all_nthP same].
       have := same (tnth (in_tuple inps) (Ordinal ilt), v) (seq.index v inputs).
       rewrite nth_zip_cond size_zip -Hsz minnn ilt => /(_ isT) /=.
       by rewrite nth_index // -(tnth_nth _ (in_tuple inps) (Ordinal ilt)).
