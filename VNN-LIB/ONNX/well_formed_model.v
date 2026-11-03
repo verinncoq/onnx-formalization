@@ -2496,6 +2496,106 @@ case: outs => [|o os] //= /andP [/eqP Ho _].
 by exists da, db, dc, ds.
 Qed.
 
+(** * Inferred dims
+
+    The dims of a value name are the dims its producer gives it: an
+    initialiser its own dims, a graph input its declared dims, and a node the
+    dims [node_out_dims] computes from its inputs.  Nodes are read in list
+    order, which [graph_acyclic] makes a topological order, so the inputs of
+    a node are inferred before the node is. *)
+Fixpoint infer_dims_rec (env : string -> option (seq nat)) (nodes : seq NodeProto)
+  : string -> option (seq nat) :=
+  if nodes is n :: ns then
+    infer_dims_rec (fun s => if s \in node_outputs n then node_out_dims env n else env s) ns
+  else env.
+
+Definition infer_dims (nodes : seq NodeProto) (inputs : seq ValueInfoProto)
+  (initialisers : seq TensorProto) : string -> option (seq nat) :=
+  infer_dims_rec (name_dims initialisers inputs) nodes.
+
+(** A name no node produces keeps the dims of its declaration. *)
+Lemma infer_dims_rec_notin env nodes s :
+  s \notin flatten (map node_outputs nodes) -> infer_dims_rec env nodes s = env s.
+Proof.
+elim: nodes env => //= n ns IH env; rewrite mem_cat negb_or => /andP [sn sns].
+by rewrite IH // (negbTE sn).
+Qed.
+
+(** In an acyclic graph no node produces the name of a graph input or of an
+    initialiser. *)
+Lemma graph_acyclic_notin nodes inputs initialisers s :
+  graph_acyclic nodes inputs initialisers ->
+  s \in (pmap value_name inputs ++ pmap tensor_name initialisers)%SEQ ->
+  s \notin flatten (map node_outputs nodes).
+Proof.
+rewrite /graph_acyclic => /andP [_]; move: (_ ++ _)%SEQ => names.
+elim: nodes names => //= n ns IH names /and4P [_ fresh _ ts] sin.
+rewrite mem_cat negb_or; apply/andP; split.
+  by apply/negP => so; move: (allP fresh _ so); rewrite sin.
+by apply: IH ts _; rewrite mem_cat sin orbT.
+Qed.
+
+Lemma tensor_has_nameE s t : tensor_has_name s t = (tensor_name t == Some s).
+Proof. by case: t => [? ? ? ? ? ? ? [n|] ? ? ? ? ? ? ?] //=; rewrite eq_sym. Qed.
+
+Lemma List_find_none {T} (p : pred T) (xs : seq T) :
+  ~~ has p xs -> List.find p xs = None.
+Proof. by elim: xs => //= x xs IH; rewrite negb_or => /andP [/negbTE -> /IH]. Qed.
+
+(** Among elements with unique names, [List.find] on a name finds the
+    element that has it. *)
+Lemma List_find_name {T : eqType} (nm : T -> option string) (p : pred T) (s : string)
+  (xs : seq T) (x : T) :
+  (forall y, p y = (nm y == Some s)) ->
+  uniq (pmap nm xs) -> x \in xs -> nm x = Some s -> List.find p xs = Some x.
+Proof.
+move=> pE; elim: xs => //= y ys IH U; rewrite in_cons pE => /orP [/eqP -> E|xin E].
+  by rewrite E eqxx.
+move: U; case E': (nm y) => [s'|] U.
+  rewrite /= in U; case: eqP => [[ss']|_]; last by apply: IH => //; case/andP: U.
+  by exfalso; case/andP: U => /negP s'n _; apply: s'n; rewrite mem_pmap ss' -E; apply/mapP; exists x.
+by case: eqP => [//|_]; exact: IH.
+Qed.
+
+(** An initialiser's inferred dims are its own dims. *)
+Lemma infer_dims_initialiser nodes inputs initialisers t s :
+  graph_acyclic nodes inputs initialisers ->
+  t \in initialisers -> tensor_name t = Some s ->
+  infer_dims nodes inputs initialisers s = Some (map int64_to_dim (get_dims t)).
+Proof.
+move=> ac tin ts; have sin : s \in (pmap value_name inputs ++ pmap tensor_name initialisers)%SEQ.
+  by rewrite mem_cat; apply/orP; right; rewrite mem_pmap; apply/mapP; exists t.
+rewrite /infer_dims (infer_dims_rec_notin _ _ _ (graph_acyclic_notin _ _ _ _ ac sin)).
+have U : uniq (pmap tensor_name initialisers).
+  by move: ac => /andP [+ _]; rewrite cat_uniq => /and3P [].
+by rewrite /name_dims (List_find_name _ _ _ _ _ (tensor_has_nameE s) U tin ts).
+Qed.
+
+(** A graph input's inferred dims are its declared dims. *)
+Lemma infer_dims_input nodes inputs initialisers i s ds :
+  graph_acyclic nodes inputs initialisers ->
+  i \in inputs -> value_name i = Some s -> value_dims i = Some ds ->
+  infer_dims nodes inputs initialisers s = Some (map int64_to_dim ds).
+Proof.
+move=> ac iin is_ ds_.
+have sin : s \in (pmap value_name inputs ++ pmap tensor_name initialisers)%SEQ.
+  by rewrite mem_cat; apply/orP; left; rewrite mem_pmap; apply/mapP; exists i.
+rewrite /infer_dims (infer_dims_rec_notin _ _ _ (graph_acyclic_notin _ _ _ _ ac sin)).
+have /and3P [U D _] : [&& uniq (pmap value_name inputs),
+    ~~ has (mem (pmap value_name inputs)) (pmap tensor_name initialisers) &
+    uniq (pmap tensor_name initialisers)].
+  by move: ac => /andP [+ _]; rewrite cat_uniq.
+have N : ~~ has (tensor_has_name s) initialisers.
+  apply/hasPn => t tin; rewrite tensor_has_nameE; apply/negP => /eqP ts.
+  have s_init : s \in pmap tensor_name initialisers.
+    by rewrite mem_pmap; apply/mapP; exists t.
+  have s_in : s \in pmap value_name inputs.
+    by rewrite mem_pmap; apply/mapP; exists i.
+  by move/negP: D; apply; apply/hasP; exists s.
+rewrite /name_dims (List_find_none _ _ N).
+by rewrite (List_find_name _ _ _ _ _ (fun _ => erefl) U iin is_) ds_.
+Qed.
+
 (** Every vertex found under a name, among any of the graph's items, has that
     name's declared dims. *)
 Lemma graph_dims_find nodes inputs initialisers shn its a w :
@@ -2931,46 +3031,44 @@ Definition mx_tensor {R : Type} (n p : nat) (M : 'M[R]_(dimc n, dimc p))
 (** Broadcasting index: [k] if it is in range, otherwise 0. *)
 Definition bidx (x k : nat) : 'I_(dimc x) := insubd (Ordinal (dimc_gt0 x)) k.
 
-(** The syntactic part of well-formedness: facts about the ONNX graph
-    itself, independent of how it is evaluated. *)
-Definition model_syntax_ok (m : ModelProto) : bool :=
+(** * Well-formed models
+
+    A model is well formed when its graph is acyclic, every graph output is a
+    node of the graph, its inputs, outputs and initialisers are named and
+    share one dtype, and the dims of every value are correct for its
+    producer and its consumers: every node accepts the dims its inputs are
+    given by their producers and gives its outputs the dims it produces, and
+    every graph output is declared with the dims its producer gives it.  Dims
+    are inferred from producers by [infer_dims], so intermediate values need
+    no declaration.  The matrix view of Gemm is a requirement of that
+    consumer alone, inside [node_out_dims]; Relu accepts any rank. *)
+Definition model_well_formed (m : ModelProto) : bool :=
   if m is ModelProto_constructor _ _ _ _ _ _ _ (Some graph) _ _ _ _ then
   let : GraphProto_constructor nodes _ initialisers _ _ inputs outputs _ _ _ := graph in
-  let items := ([seq node x0 | x0 <- List.rev nodes] ++ [seq input x0 | x0 <- inputs] ++ [seq tensor x0 | x0 <- initialisers])%SEQ in
+  let items := graph_items nodes inputs initialisers in
   let dt := if outputs is o :: _ then value_tensor_type o else None in
+  let shn := infer_dims nodes inputs initialisers in
   [&& (** names are unique and every node input is defined before it is used **)
-      graph_acyclic nodes inputs initialisers, (** The graph structure is acyclic **)
+      graph_acyclic nodes inputs initialisers,
       (** every output names exactly one vertex, and that vertex is a node **)
       all (fun x => if value_name x is Some s then
                       if find_vertex items s is [:: node _] then true else false
                     else false) outputs,
       (** inputs and outputs are named, declare their dims, and share one dtype dt **)
       all (fun v => [&& value_tensor_type v != None, value_tensor_type v == dt,
-                        value_name v != None & value_dims v != None]) (inputs ++ outputs) &
+                        value_name v != None & value_dims v != None]) (inputs ++ outputs),
       (** initialisers are named, have dtype dt, and their data fills their dims **)
       all (fun t => [&& tensor_dtype t == dt, tensorProtoSized t & tensor_name t != None])
-          initialisers]
-  else false.
-
-(** The part of well-formedness specific to our evaluator.  Every node is a
-    supported operation whose declared input and output dims fit it: a graph
-    with a Gemm is thereby a graph over matrices, while Relu alone puts no
-    bound on the rank.  Every declaration of an input, output or initialiser
-    name agrees with the dims assigned to that name. *)
-Definition model_eval_ok (m : ModelProto) : bool :=
-  if m is ModelProto_constructor _ _ _ _ _ _ _ (Some graph) _ _ _ _ then
-  let : GraphProto_constructor nodes _ initialisers _ _ inputs outputs value_info _ _ := graph in
-  let shn := name_dims initialisers (inputs ++ outputs ++ value_info)%SEQ in
-  [&& all (predI (node_dims_ok shn) (gemm_int_attrs_ok \o get_attributes)) nodes,
+          initialisers,
+      (** every node accepts the dims its producers give its inputs and gives
+          its outputs the dims it produces **)
+      all (node_dims_ok shn) nodes,
+      (** every output is declared with the dims its producer gives it **)
       all (fun v => if (value_name v, value_dims v) is (Some s, Some ds)
-                    then shn s == Some (map int64_to_dim ds) else false) (inputs ++ outputs) &
-      all (fun t => if tensor_name t is Some s
-                    then shn s == Some (map int64_to_dim (get_dims t)) else false)
-          initialisers]
+                    then shn s == Some (map int64_to_dim ds) else false) outputs &
+      (** our evaluator needs integral alpha and beta on a Gemm over ints **)
+      all (gemm_int_attrs_ok \o get_attributes) nodes]
   else false.
-
-Definition model_well_formed (m : ModelProto) : bool :=
-  model_syntax_ok m && model_eval_ok m.
 
 Lemma well_formed_computes (m : ModelProto) (xs : seq TensorProto)
   : all tensorProtoSized xs ->
@@ -3002,9 +3100,7 @@ rewrite listmap_map.
 case: x => x /mapP [// x0 xin [xis]].
 move: xin.
 rewrite -xis => xin.
-move/andP: well_formed => [/and4P [w3 /allP /(_ x xin) + decl init_ok]].
-move=> + /and3P [w_nodes v_sh i_sh].
-move: w_nodes; rewrite all_predI => /andP [nodes_sh w5].
+case/and5P: well_formed => w3 /allP /(_ x xin) + decl init_ok /and3P [nodes_sh v_sh w5].
 have w2 : all valid_op nodes.
   by apply/allP => n /(allP nodes_sh); exact: node_dims_ok_valid_op.
 have w4 : all tensorProtoSized initialisers.
@@ -3014,12 +3110,21 @@ have init_dt : all (fun t => tensor_dtype t == value_tensor_type x) initialisers
   by rewrite xdt; apply/allP => t /(allP init_ok) /and3P [].
 move/allP/(_ x xin): inputs_dt => xs_dt.
 case: (value_tensor_type x) xdt_ne init_dt xs_dt => [dt|//] _ init_dt xs_dt.
-move: (name_dims _ _) nodes_sh i_sh v_sh => shn nodes_sh init_sh v_sh.
+(** the dims inferred for initialisers and inputs are their own **)
+have init_sh : all (fun u => if tensor_name u is Some s
+    then infer_dims nodes inputs initialisers s == Some (map int64_to_dim (get_dims u))
+    else false) initialisers.
+  apply/allP => t tin; have := allP init_ok _ tin => /and3P [_ _].
+  by case E: (tensor_name t) => [s|] // _; rewrite (infer_dims_initialiser _ _ _ _ _ w3 tin E).
 have in_sh : forall i, i \in inputs -> forall nm u, value_name i = Some nm -> u \in xs ->
-    tensor_has_name nm u -> shn nm = Some (map int64_to_dim (get_dims u)).
-  move=> i iin nm u E ux hn; move: (allP v_sh i) (allP xs_sh i iin).
-  rewrite mem_cat iin E => /(_ isT); case: (value_dims i) => // ds /eqP e.
-  by move=> /allP /(_ u ux); rewrite hn /= e => /eqP.
+    tensor_has_name nm u ->
+    infer_dims nodes inputs initialisers nm = Some (map int64_to_dim (get_dims u)).
+  move=> i iin nm u E ux hn.
+  have := allP decl i; rewrite mem_cat iin => /(_ isT) /and4P [_ _ _].
+  case Ed: (value_dims i) => [ds|] // _.
+  move: (allP xs_sh i iin); rewrite E => /allP /(_ u ux); rewrite hn Ed /= => /eqP [e].
+  by rewrite (infer_dims_input _ _ _ _ _ _ w3 iin E Ed) e.
+move: (infer_dims nodes inputs initialisers) nodes_sh init_sh in_sh => shn nodes_sh init_sh in_sh.
 move=> {v_sh xs_sh decl init_ok xdt}.
 have {}in_one : all (fun i => if value_name i is Some nm then
     size (filter (tensor_has_name nm) xs) == 1%nat else false) inputs := in_one.
@@ -3027,7 +3132,7 @@ rewrite /value_name.
 case: x x0 xis xin => [[xname|//]] xtype xstring xmeta /[dup] /= x' x'' -> xin'.
 case E: (find_vertex _ xname) => [|x [|? ?]] //; last by case: x E.
 move=> _; move: E => /[dup] /finds_in.
-rewrite H => xin.
+rewrite /graph_items H => xin.
 rewrite /find_vertex => ->.
 move=> {x' x'' xin' xname xtype xstring xmeta ir opset prod_name prod_vers domain model_version doc name doc_string value_info quantisation metadata_props metadata training functions config}.
 move/graph_acyclic_at:w3.

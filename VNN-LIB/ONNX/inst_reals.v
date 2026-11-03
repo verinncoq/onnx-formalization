@@ -43,10 +43,9 @@ case: m dm wf oin => ir opset prod_name prod_vers domain model_version doc
 move: dm wf oin => /= dm wf oin.
 (** [vertices] of onnx_evaluator **)
 move Hv: (graph_items nodes inputs initialisers) => vertices.
-move/andP: wf => [/and4P [acyc /allP outs_one /allP decl /allP init_ok]].
-move=> /and3P [/allP nodes_ok /allP v_sh /allP i_sh].
+case/and5P: wf => acyc /allP outs_one /allP decl /allP init_ok /and3P [/allP nodes_ok /allP o_sh _].
 have vop n : node n \in vertices -> valid_op n.
-  by rewrite -Hv mem_graph_items_node => /nodes_ok /andP [/node_dims_ok_valid_op].
+  by rewrite -Hv mem_graph_items_node => /nodes_ok /node_dims_ok_valid_op.
 have sized t : tensor t \in vertices -> tensorProtoSized t.
   by rewrite -Hv mem_graph_items_tensor => /init_ok /and3P [].
 have named i : input i \in vertices -> value_name i != None.
@@ -62,11 +61,10 @@ have Hsz' : size inps' = size inps.
   by move: in_match; rewrite all2E => /andP [/eqP].
 (** every vertex has the real tensor type of its name's declared dims **)
 pose sem := @realElementTypeInterp R.
-pose shn := name_dims initialisers (inputs ++ outputs ++ value_info)%SEQ.
+pose shn := infer_dims nodes inputs initialisers.
 pose ty (w : vertex) := @tensorType RealElementType real
   (dims_type (odflt [::] (shn (seq.head ""%string (vnames w))))).
-have nodes_sh : all (node_dims_ok shn) nodes.
-  by apply/allP => m /nodes_ok /andP [].
+have nodes_sh : all (node_dims_ok shn) nodes by apply/allP.
 (** every vertex found under a name has that name's dims **)
 have sh_find its i w : {subset its <= vertices} -> find_vertex its i = [:: w] ->
     shn (seq.head ""%string (vnames w)) = shn i.
@@ -184,7 +182,11 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
   - (** Tensor: just return itself, with its entries as reals **)
     have tin : t \in initialisers by move: (sub _ win); rewrite -Hv mem_graph_items_tensor.
     have := sized t (sub _ win).
-    move: (i_sh t tin) => tsh.
+    have tsh : if tensor_name t is Some s
+               then infer_dims nodes inputs initialisers s == Some (map int64_to_dim (get_dims t))
+               else false.
+      move: (init_ok t tin) => /and3P [_ _]; case E: (tensor_name t) => [s|] // _.
+      by rewrite (infer_dims_initialiser _ _ _ _ _ acyc tin E) eqxx.
     case: t win ac tin tsh => dims [dt|] seg fd i32 sd i64 tn ds rd ed dl dd u64 mp
                               win ac tin tsh /andP [dpos] //.
     case E: (DataType_TensorProto_of_int32 dt) => [x|] // Hsize.
@@ -260,7 +262,13 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
     case: (tnth (in_tuple inps) (Ordinal ilt)) => ei [ki dsi] /= /andP [_ /eqP vdims] /eqP /= Ed.
     move: X; rewrite -Ed /= => X.
     (** X has the type of the input's declared dims **)
-    move: (v_sh v) vdims; rewrite mem_cat vin => /(_ isT).
+    have vsh : if (value_name v, value_dims v) is (Some s, Some ds)
+               then infer_dims nodes inputs initialisers s == Some (map int64_to_dim ds)
+               else false.
+      move: (decl v); rewrite mem_cat vin => /(_ isT) /and4P [_ _].
+      case Evn: (value_name v) => [s|] // _; case Evd: (value_dims v) => [ds|] // _.
+      by rewrite (infer_dims_input _ _ _ _ _ _ acyc vin Evn Evd) eqxx.
+    move: vsh vdims.
     rewrite /ty /vnames /=.
     case: (value_name v) => [nm|] //=.
     case: (value_dims v) => [l|] //= /eqP; rewrite -/shn => -> [vdims].
@@ -281,10 +289,8 @@ have ac : acyclic_at vertices (node n).
 have Y := go (size vertices) vertices (node n) erefl win (fun _ x => x) ac.
 (** Y has the type of the output's declared dims, which are d1's, which are d2's **)
 move: Y; rewrite /ty (sh_find _ _ _ (fun _ x => x) F) => Y.
-have oin' : ValueInfoProto_constructor (Some nm) ot od om \in (inputs ++ outputs)%SEQ.
-  by rewrite mem_cat oin orbT.
-set ov := ValueInfoProto_constructor (Some nm) ot od om in oin' otype *.
-move: (v_sh _ oin') otype; cbv beta; rewrite /value_has_type (_ : value_name ov = Some nm) //.
+set ov := ValueInfoProto_constructor (Some nm) ot od om in oin otype *.
+move: (o_sh _ oin) otype; cbv beta; rewrite /value_has_type (_ : value_name ov = Some nm) //.
 case: (value_dims ov) => [l|] //= /eqP sh /andP [_ /eqP [odims]].
 have HT : tensorDims _ d1 = dims_type (map int64_to_dim l).
   by case: (tensorDims _ d1) odims => kd dsd /= odims; exact: dims_typeE (esym odims).
