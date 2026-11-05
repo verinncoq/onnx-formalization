@@ -2782,13 +2782,45 @@ Qed.
 (** * Tensor types of static dims
 
     The semantics of a vertex is a mathcomp tensor whose dims are the declared
-    dims of the vertex's name.  Gemm reads a rank <= 2 tensor as a matrix and
-    produces a rank-2 tensor; the helpers below do these two conversions. *)
+    dims of the vertex's name.  The dims are built from [cons_tuple]s, so a rank-2
+    tensor coerces to a matrix and back. *)
 
-(** The tensor dims of a dims list: every entry as a positive number.
-    [insubd] keeps it total; on positive dims it is the identity. *)
+(** A dimension as a positive number: [x] if positive, otherwise 1.  It is
+    structural, so it computes on closed dims. *)
+Definition dim_pos (x : nat) : {posnum nat} :=
+  if x is S m then (S m)%:posnat else 1%:posnat.
+
+Definition dimc (x : nat) : nat := (dim_pos x)%:num.
+
+Lemma dimc_gt0 x : (0 < dimc x)%nat.
+Proof. by case: x. Qed.
+
+Lemma dimc_id x : (0 < x)%nat -> dimc x = x.
+Proof. by case: x. Qed.
+
+Fixpoint pos_tuple (ds : seq nat) : (size ds).-tuple {posnum nat} :=
+  match ds as ds0 return (size ds0).-tuple {posnum nat} with
+  | [::] => [tuple]
+  | d :: ds' => cons_tuple (dim_pos d) (pos_tuple ds')
+  end.
+
+(** The tensor dims of a dims list: every entry as a positive number. *)
 Definition dims_type (ds : seq nat) : {k : nat & {posnum nat} ^ k} :=
-  existT _ (size ds) [ffun i : 'I_(size ds) => insubd 1%:posnat (tnth (in_tuple ds) i)].
+  existT _ (size ds) (finfun_of_tuple (pos_tuple ds)).
+
+Lemma map_pos_tuple ds :
+  map (fun q : {posnum nat} => q%:num) (tval (pos_tuple ds)) = map dimc ds.
+Proof. by elim: ds => //= d ds ->. Qed.
+
+Lemma dims_type_num ds (i : 'I_(size ds)) :
+  (projT2 (dims_type ds) i)%:num = dimc (tnth (in_tuple ds) i).
+Proof.
+have -> : projT2 (dims_type ds) i = tnth (pos_tuple ds) i.
+  by rewrite /dims_type /= /finfun_of_tuple ffunE.
+rewrite (tnth_nth 1%:posnat) (tnth_nth 0%nat) /=.
+rewrite -(nth_map 1%:posnat (1%:posnat)%:num) ?size_tuple // map_pos_tuple.
+by rewrite (nth_map 0%nat).
+Qed.
 
 (** Positive dims are the dims of their tensor type. *)
 Lemma dims_typeE (ds : seq nat) k (sh : {posnum nat} ^ k) :
@@ -2796,54 +2828,37 @@ Lemma dims_typeE (ds : seq nat) k (sh : {posnum nat} ^ k) :
 Proof.
 move=> E; have Hk : k = size ds by rewrite -E size_map size_tuple.
 subst k; rewrite /dims_type; congr existT.
-apply/ffunP => i; rewrite ffunE.
+apply/ffunP => i; apply: val_inj => /=.
+change (val (sh i) = (projT2 (dims_type ds) i)%:num).
+rewrite dims_type_num.
 have -> : tnth (in_tuple ds) i = (sh i)%:num.
   rewrite (tnth_nth 0%nat) -[X in nth _ X _]E (nth_map (sh i)) ?size_tuple //.
   by rewrite -tnth_nth /tuple_of_finfun tnth_mktuple.
-by rewrite valKd.
-Qed.
-
-(** A dimension as a positive number: [x] if positive, otherwise 1. *)
-Definition dimc (x : nat) : nat := (insubd 1%:posnat x : {posnum nat})%:num.
-
-Lemma dimc_gt0 x : (0 < dimc x)%nat.
-Proof.
-by rewrite /dimc; case: (insubd _ _) => v /=; rewrite /Itv.nat_sem /= in_itv /= ?andbT ?ltz_nat.
-Qed.
-
-Lemma dimc_id x : (0 < x)%nat -> dimc x = x.
-Proof.
-move=> x0; rewrite /dimc insubdK //.
-by rewrite -topredE /= /Itv.spec /= /Itv.nat_sem /= in_itv /= ?andbT ?ltz_nat.
+rewrite dimc_id //.
+by case: (sh i) => v /=; rewrite /Itv.nat_sem /= in_itv /= ?andbT ?ltz_nat.
 Qed.
 
 Lemma prod_ord0 (f : {posnum nat} ^ 0) : (\prod_(j < 0) (f j)%:num = 1)%nat.
 Proof. by rewrite big_ord0. Qed.
 
-(** A rank <= 2 tensor has as many entries as its matrix view. *)
-Lemma prod_dims_type2 ds : (size ds <= 2)%nat ->
-  (\prod_(i < size ds) (projT2 (dims_type ds) i)%:num
-   = dimc (mat_of_dims ds).1 * dimc (mat_of_dims ds).2)%nat.
-Proof.
-case: ds => [|h [|w [|? ?]]] //= _.
-- by rewrite big_ord0 dimc_id.
-- by rewrite big_ord1 ffunE /= dimc_id // mul1n.
-- by rewrite !big_ord_recl big_ord0 !ffunE /= muln1.
-Qed.
+(** A rank <= 2 tensor as a matrix: a scalar is a 1 x 1 matrix and a vector a
+    row, as [mat_of_dims] reads them for Gemm. *)
+Definition tensor_mx {R : Type} (ds : seq nat)
+  : (size ds <= 2)%nat -> 'nT[R]_(projT2 (dims_type ds)) ->
+    'M[R]_(dimc (mat_of_dims ds).1, dimc (mat_of_dims ds).2) :=
+  match ds with
+  | [::] => fun _ t => const_mx (tensor_nil t)
+  | [:: w] => fun _ t => \matrix_(i, j) tensor_nil (nindex t j)
+  | [:: h; w] => fun _ t => t
+  | _ => fun H _ => False_rect _ (notF H)
+  end.
 
-(** A rank <= 2 tensor as a matrix, and a matrix as a rank-2 tensor. *)
-Definition tensor_mx {R : Type} (ds : seq nat) (H : (size ds <= 2)%nat)
-  (t : 'nT[R]_(projT2 (dims_type ds)))
-  : 'M[R]_(dimc (mat_of_dims ds).1, dimc (mat_of_dims ds).2) :=
-  vec_mx (castmx (prod_ord0 _, prod_dims_type2 _ H) (tensor_val t)^T).
-
-Definition mx_tensor {R : Type} (n p : nat) (M : 'M[R]_(dimc n, dimc p))
-  : 'nT[R]_(projT2 (dims_type [:: n; p])) :=
-  @Tensor _ _ _ _ _ (castmx (esym (prod_dims_type2 _ (isT : (size [:: n; p] <= 2)%nat)),
-                             esym (prod_ord0 _)) (mxvec M)^T).
-
-(** Broadcasting index: [k] if it is in range, otherwise 0. *)
-Definition bidx (x k : nat) : 'I_(dimc x) := insubd (Ordinal (dimc_gt0 x)) k.
+(** Broadcasting index: [k] if it is in range, otherwise 0; computes. *)
+Definition bidx (x k : nat) : 'I_(dimc x) :=
+  match (k < dimc x)%nat as b return (k < dimc x)%nat = b -> 'I_(dimc x) with
+  | true => fun E => Ordinal E
+  | false => fun _ => Ordinal (dimc_gt0 x)
+  end erefl.
 
 (** * Well-formed models
 
@@ -2881,7 +2896,7 @@ Definition model_well_formed (m : ModelProto) : bool :=
       all (fun v => if (value_name v, value_dims v) is (Some s, Some ds)
                     then shn s == Some (map int64_to_dim ds) else false) outputs &
       (** our evaluator needs integral alpha and beta on a Gemm over ints **)
-      all (gemm_int_attrs_ok \o get_attributes) nodes]
+      all (fun n => (dt == Some FLOAT_TensorProto) || gemm_int_attrs_ok (get_attributes n)) nodes]
   else false.
 
 Lemma well_formed_computes (m : ModelProto) (xs : seq TensorProto)
@@ -2918,13 +2933,13 @@ case/and5P: well_formed => w3 /allP /(_ x xin) + decl init_ok /and3P [nodes_sh v
 have w2 : all valid_op nodes.
   by apply/allP => n /(allP nodes_sh); exact: node_dims_ok_valid_op.
 have w4 : all tensorProtoSized initialisers.
-  by apply/allP => t /(allP init_ok) /andP [].
-have := allP decl x; rewrite mem_cat xin orbT => /(_ isT) /andP [xdt_ne /eqP xdt].
+  by apply/allP => t /(allP init_ok) /and3P [].
+have := allP decl x; rewrite mem_cat xin orbT => /(_ isT) /and4P [xdt_ne /eqP xdt _ _].
 rewrite -xdt in w5.
 have init_dt : all (fun t => tensor_dtype t == value_tensor_type x) initialisers.
-  by rewrite xdt; apply/allP => t /(allP init_ok) /andP [].
+  by rewrite xdt; apply/allP => t /(allP init_ok) /and3P [].
 move/allP/(_ x xin): inputs_dt => xs_dt.
-case: (value_tensor_type x) xdt_ne init_dt xs_dt => [dt|//] _ init_dt xs_dt.
+case: (value_tensor_type x) xdt_ne init_dt xs_dt w5 => [dt|//] _ init_dt xs_dt w5.
 (** the dims inferred for initialisers and inputs are their own **)
 have init_sh : all (fun u => if tensor_name u is Some s
     then infer_dims nodes inputs initialisers s == Some (map int64_to_dim (get_dims u))

@@ -12,7 +12,7 @@ From ONNXFormalization.ProtobufDatatypes Require Export int.
 From ONNXFormalization.ProtobufDatatypes Require Export bytes.
 From Flocq Require Import Bits.
 From ONNXFormalization.VNNLIB.ONNX Require Import Syntax Semantics mc_inst real.
-From ONNXFormalization.VNNLIB.ONNX Require Import inst_syntax inst_sem.
+From ONNXFormalization.VNNLIB.ONNX Require Import inst_syntax inst_sem graph_eval.
 From ONNXFormalization.ONNXEvaluator Require Import onnx_evaluator op_comp op_add op_matmul op_neg.
 Import Order.TTheory.
 Import Order.DefaultSeqProdOrder.
@@ -25,278 +25,122 @@ Open Scope quotient_scope.
 (**************** REALS *********************)
 (********************************************)
 
-(*
-Real-valued version of ONNXEvaluator/theory/onnx_evaluator.v.
-The graph walk is the same as onnx_evaluator_recursive. The values on the
-edges are the semantic tensors themselves, each paired with its tensor type:
-  {d : TensorType RealElementType & TensorSemantics realElementTypeInterp d}
-Gemm and Relu are computed directly on these with mathcomp operations.
-*)
+(** The real semantics of a network is [real_name_eval] of [graph_eval], and
+    it computes: a closed model reduces to the matrix expression it denotes.
+    The evaluator's [option] is discharged by [real_name_eval_fits]: on a
+    well-formed model with matching inputs, a declared output always evaluates,
+    to the declared dims. *)
 
-Definition realSemantics : (@RealNetworkSemantics syntax_inst R).
-move=> [[inps inps_gt0] [outs outs_gt0]] [[inps' inps_gt0'] [outs' outs_gt0']] d1 d2 u
-  [m /= /andP [dm wf]] /andP [in_match _] inp.
+Definition tv_of_sem (d : TensorType RealElementType)
+  : TensorSemantics (@realElementTypeInterp R) d -> @tv R :=
+  match d with
+  | tensorType _ (existT _ dims) => @tv_of_tensor _ dims
+  end.
+
+(** The user inputs in position order. *)
+Definition input_tvs (y : NetworkType RealElementType)
+  : InputSemantics (@realElementTypeInterp R) y -> seq (@tv R) :=
+  match y with
+  | networkType ins _ => fun inp =>
+      [seq tv_of_sem _ (inp i) | i <- fintype.enum 'I_(size ins)]
+  end.
+
+Lemma tag_tv_of_sem d (t : TensorSemantics (@realElementTypeInterp R) d) :
+  tag (tv_of_sem d t) = dims_seq (projT2 (tensorDims _ d)).
+Proof. by case: d t => tt [k dims] t. Qed.
+
+Lemma real_name_eval_fits y1 y2 d1 (d2 : TensorType RealElementType) u (m : well_formed_model y1) :
+  NetworkShapesMatch y1 y2 ->
+  forall inp : InputSemantics (@realElementTypeInterp R) y2,
+  nodeOutput y1 m u d1 -> TensorShapesMatch d1 d2 ->
+  value_fits (projT2 (tensorDims _ d2)) (real_name_eval (proj1_sig m) u (input_tvs y2 inp)).
+Proof.
+move: y1 y2 m => [[inps g1] [outs g2]] [[inps' g3] [outs' g4]] [m dmwf] sm inp.
 case=> o /and3P [oin /eqP oname otype] d12.
+cbv beta iota delta [proj1_sig].
+case/andP: dmwf => dm wf; case/andP: sm => in_match _.
 case: m dm wf oin => ir opset prod_name prod_vers domain model_version doc
   [[nodes name initialisers sparse_initialisers doc_string inputs outputs value_info
-    quantisation metadata_props]|//] metadata training functions config dm wf oin /=.
-move: dm wf oin => /= dm wf oin.
-(** [vertices] of onnx_evaluator **)
-move Hv: (graph_items nodes inputs initialisers) => vertices.
-case/and5P: wf => acyc /allP outs_one /allP decl /allP init_ok /and3P [/allP nodes_ok /allP o_sh _].
-have vop n : node n \in vertices -> valid_op n.
-  by rewrite -Hv mem_graph_items_node => /nodes_ok /node_dims_ok_valid_op.
-have sized t : tensor t \in vertices -> tensorProtoSized t.
-  by rewrite -Hv mem_graph_items_tensor => /init_ok /andP [].
-have in_inputs i : input i \in vertices -> i \in inputs.
-  by rewrite -Hv mem_graph_items_input.
-have no_output v : output v \in vertices = false.
-  by rewrite -Hv output_notin_graph_items.
+    quantisation metadata_props]|//] metadata training functions config dm wf oin.
+rewrite /= in dm wf oin.
+case/and5P: wf => acyc /allP outs_one /allP decl /allP init_ok /and3P [nodes_ok /allP o_sh _].
 have Hsz : size inps = size inputs.
   by move/andP: dm => [+ _]; rewrite all2E => /andP [/eqP].
 have Hsz' : size inps' = size inps.
   by move: in_match; rewrite all2E => /andP [/eqP].
-(** every vertex has the real tensor type of its name's declared dims **)
-pose sem := @realElementTypeInterp R.
-pose shn := infer_dims nodes inputs initialisers.
-pose ty (w : vertex) := @tensorType RealElementType real
-  (dims_type (odflt [::] (shn (seq.head ""%string (vnames w))))).
-have nodes_sh : all (node_dims_ok shn) nodes by apply/allP.
-(** every vertex found under a name has that name's dims **)
-have sh_find its i w : {subset its <= vertices} -> find_vertex its i = [:: w] ->
-    shn (seq.head ""%string (vnames w)) = shn i.
-  by move=> sub F; apply: (graph_dims_find nodes inputs initialisers _ _ _ _ nodes_sh _ F); rewrite Hv.
-(** the attributes alpha and beta as reals **)
-pose R_of_float32 (f : float32) : R := Binary.B2R 24 128 f.
-(** onnx_evaluator_recursive **)
-have go : forall (depth : nat) (its : seq vertex) (w : vertex),
-    size its = depth -> w \in its -> {subset its <= vertices} -> acyclic_at its w ->
-    TensorSemantics sem (ty w).
-  elim=> [|depth IH] its w Hd win sub ac.
-    by move/size0nil: Hd win => ->.
-  case: w win ac => [n|t|v|v] win ac.
-  - (** Node: check op_type and compute it if possible **)
-    have child i w : i \in node_inputs n -> find_vertex its i = [:: w] ->
-        TensorSemantics sem (ty w).
-      move=> iin F.
-      have wn : w != node n.
-        by have [w' F' wn] := acyclic_at_find ac iin; move: F' wn; rewrite F => -[->].
-      apply: (IH (rem (node n) its) w).
-      + by rewrite size_rem // Hd.
-      + exact: rem_mem (finds_in F).
-      + by move=> z /mem_rem /sub.
-      + exact: acyclic_at_child ac iin F.
-    have found i : i \in node_inputs n ->
-        exists2 w, find_vertex its i = [:: w] & w != node n := acyclic_at_find ac.
-    have := vop n (sub _ win).
-    case: n win ac child found => ins n_outs n_name [s|] n_dom n_ov attrs n_doc n_meta n_x
-                                  win ac child found //=.
-    case: ifP => sG.
-    + (** Gemm **)
-      move/String.eqb_eq: sG => sE; subst s.
-      case: ins win ac child found => [|a [|b [|c [|? ?]]]] //= win ac child found _.
-      * (** two inputs **)
-        have ina : a \in [:: a; b] by rewrite inE eqxx.
-        have inb : b \in [:: a; b] by rewrite !inE eqxx orbT.
-        case Fa: (find_vertex its a) => [|va [|? ?]];
-          try by exfalso; case: (found a ina) => ?; rewrite Fa.
-        case Fb: (find_vertex its b) => [|vb [|? ?]];
-          try by exfalso; case: (found b inb) => ?; rewrite Fb.
-        (** node_dims_ok: a and b are matrices with matching inner dimension, and the
-            output is declared as [N; P] **)
-        have Nn : node_dims_ok shn (NodeProto_constructor [:: a; b] n_outs n_name (Some """Gemm""")
-                                       n_dom n_ov attrs n_doc n_meta n_x).
-          by apply: (allP nodes_sh); move: (sub _ win); rewrite -Hv mem_graph_items_node.
-        move: (child a va ina Fa) (child b vb inb Fb).
-        rewrite /ty (sh_find _ _ _ sub Fa) (sh_find _ _ _ sub Fb) /vnames /node_outputs.
-        case/node_dims_ok_gemm2: Nn => da [db [ds [-> -> /gemm_out_dimsP + ->]]].
-        case: (get_gemm_attributes attrs) => [[[alpha beta] tA] tB] [sa sb inner -> _] A B.
-        apply: (mx_tensor (trans_dims tA (mat_of_dims da)).1 (trans_dims tB (mat_of_dims db)).2).
-        (** alpha A' B', with A' and B' transposed as transA, transB say **)
-        move: inner A B; rewrite /trans_dims.
-        case: (Z_of_int64 tA) => [|pA|pA]; case: (Z_of_int64 tB) => [|pB|pB] inner A B;
-          first [ exact (scalemx (R_of_float32 alpha) ((tensor_mx _ sa A)
-                           *m (castmx (congr1 dimc (esym inner), erefl) (tensor_mx _ sb B))))
-                | exact (scalemx (R_of_float32 alpha) ((tensor_mx _ sa A)^T
-                           *m (castmx (congr1 dimc (esym inner), erefl) (tensor_mx _ sb B))))
-                | exact (scalemx (R_of_float32 alpha) ((tensor_mx _ sa A)
-                           *m (castmx (congr1 dimc (esym inner), erefl) (tensor_mx _ sb B)^T)))
-                | exact (scalemx (R_of_float32 alpha) ((tensor_mx _ sa A)^T
-                           *m (castmx (congr1 dimc (esym inner), erefl) (tensor_mx _ sb B)^T))) ].
-      * (** three inputs **)
-        have ina : a \in [:: a; b; c] by rewrite inE eqxx.
-        have inb : b \in [:: a; b; c] by rewrite !inE eqxx orbT.
-        have inc : c \in [:: a; b; c] by rewrite !inE eqxx !orbT.
-        case Fa: (find_vertex its a) => [|va [|? ?]];
-          try by exfalso; case: (found a ina) => ?; rewrite Fa.
-        case Fb: (find_vertex its b) => [|vb [|? ?]];
-          try by exfalso; case: (found b inb) => ?; rewrite Fb.
-        case Fc: (find_vertex its c) => [|vc [|? ?]];
-          try by exfalso; case: (found c inc) => ?; rewrite Fc.
-        have Nn : node_dims_ok shn (NodeProto_constructor [:: a; b; c] n_outs n_name (Some """Gemm""")
-                                       n_dom n_ov attrs n_doc n_meta n_x).
-          by apply: (allP nodes_sh); move: (sub _ win); rewrite -Hv mem_graph_items_node.
-        move: (child a va ina Fa) (child b vb inb Fb) (child c vc inc Fc).
-        rewrite /ty (sh_find _ _ _ sub Fa) (sh_find _ _ _ sub Fb) (sh_find _ _ _ sub Fc).
-        rewrite /vnames /node_outputs.
-        case/node_dims_ok_gemm3: Nn => da [db [dc [ds [-> -> -> /gemm_out_dimsP + ->]]]].
-        case: (get_gemm_attributes attrs) => [[[alpha beta] tA] tB] [sa sb inner -> cok] A B C.
-        have sc : (size dc <= 2)%nat by move: cok; case: (mat_of_dims dc) => ? ? /andP [].
-        apply: (mx_tensor (trans_dims tA (mat_of_dims da)).1 (trans_dims tB (mat_of_dims db)).2).
-        (** alpha A' B' + beta C, with C broadcast to (N, P): a dimension of size 1
-            always reads index 0 **)
-        move: inner A B; rewrite /trans_dims.
-        case: (Z_of_int64 tA) => [|pA|pA]; case: (Z_of_int64 tB) => [|pB|pB] inner A B;
-          first [ exact ((scalemx (R_of_float32 alpha) ((tensor_mx _ sa A)
-                           *m (castmx (congr1 dimc (esym inner), erefl) (tensor_mx _ sb B)))) +
-                                (scalemx (R_of_float32 beta)
-                                  (\matrix_(i, j) tensor_mx _ sc C (bidx _ i) (bidx _ j))))%R
-                | exact ((scalemx (R_of_float32 alpha) ((tensor_mx _ sa A)^T
-                           *m (castmx (congr1 dimc (esym inner), erefl) (tensor_mx _ sb B)))) +
-                                (scalemx (R_of_float32 beta)
-                                  (\matrix_(i, j) tensor_mx _ sc C (bidx _ i) (bidx _ j))))%R
-                | exact ((scalemx (R_of_float32 alpha) ((tensor_mx _ sa A)
-                           *m (castmx (congr1 dimc (esym inner), erefl) (tensor_mx _ sb B)^T))) +
-                                (scalemx (R_of_float32 beta)
-                                  (\matrix_(i, j) tensor_mx _ sc C (bidx _ i) (bidx _ j))))%R
-                | exact ((scalemx (R_of_float32 alpha) ((tensor_mx _ sa A)^T
-                           *m (castmx (congr1 dimc (esym inner), erefl) (tensor_mx _ sb B)^T))) +
-                                (scalemx (R_of_float32 beta)
-                                  (\matrix_(i, j) tensor_mx _ sc C (bidx _ i) (bidx _ j))))%R ].
-    + case: ifP => // sR.
-      (** Relu: the same dims as its input, whatever the rank **)
-      move/String.eqb_eq: sR => sE; subst s.
-      case: ins win ac child found => [|a [|? ?]] //= win ac child found _.
-      have ina : a \in [:: a] by rewrite inE eqxx.
-      case Fa: (find_vertex its a) => [|va [|? ?]];
-        try by exfalso; case: (found a ina) => ?; rewrite Fa.
-      have Nn : node_dims_ok shn (NodeProto_constructor [:: a] n_outs n_name (Some """Relu""")
-                                     n_dom n_ov attrs n_doc n_meta n_x).
-        by apply: (allP nodes_sh); move: (sub _ win); rewrite -Hv mem_graph_items_node.
-      move: (child a va ina Fa); rewrite /ty (sh_find _ _ _ sub Fa) /vnames /node_outputs.
-      move/node_dims_ok_relu: Nn => -> A.
-      exact (@Tensor _ _ _ _ _ (map_mx (fun x => Num.max x 0%R) (tensor_val A))).
-  - (** Tensor: just return itself, with its entries as reals **)
-    have tin : t \in initialisers by move: (sub _ win); rewrite -Hv mem_graph_items_tensor.
-    have := sized t (sub _ win).
-    have tsh : if tensor_name t is Some s
-               then infer_dims nodes inputs initialisers s == Some (map int64_to_dim (get_dims t))
-               else false.
-      move: (init_ok t tin) => /and3P [_ _]; case E: (tensor_name t) => [s|] // _.
-      by rewrite (infer_dims_initialiser _ _ _ _ _ acyc tin E) eqxx.
-    case: t win ac tin tsh => dims [dt|] seg fd i32 sd i64 tn ds rd ed dl dd u64 mp
-                              win ac tin tsh /andP [dpos] //.
-    case E: (DataType_TensorProto_of_int32 dt) => [x|] // Hsize.
-    have xin : x \in supported_types by case: x E Hsize.
-    have pos (i : 'I_(size dims)) : Itv.spec Itv.nat_sem (Itv.Real `]0%R, +oo[)
-                                     (int64_to_dim (tnth (in_tuple dims) i)).
-      have := allP dpos _ (mem_tnth i (in_tuple dims)).
-      by rewrite /Itv.spec /= /Itv.nat_sem in_itv /= andbT.
-    (** [ltac:] so that the positivity of [1%:posnat] is solved, not abstracted **)
-    pose shape : {posnum nat} ^ (size dims) :=
-      ltac:(exact [ffun i => insubd 1%:posnat (int64_to_dim (tnth (in_tuple dims) i))]).
-    have shapeE : map (fun q : {posnum nat} => q%:num) (tval shape) = map int64_to_dim dims.
-      have -> : map (fun q : {posnum nat} => q%:num) (tval shape) =
-                tval (map_tuple (fun q : {posnum nat} => q%:num) shape) by [].
-      have -> : map int64_to_dim dims = tval (map_tuple int64_to_dim (in_tuple dims)) by [].
-      congr tval; apply: eq_from_tnth => i.
-      by rewrite !tnth_map tnth_ord_tuple ffunE insubdK //; exact: pos i.
-    (** an entry of dtype x as a real **)
-    pose to_R : denote (exist _ x xin) -> R :=
-      ltac:(case: (x) (xin) => xin';
-            first [ exact (fun f : float32 => R_of_float32 f)
-                  | exact (fun i : int32 => IZR (Z_of_int32 i))
-                  | exact (fun i : int64 => IZR (Z_of_int64 i))
-                  | by exfalso; move: xin'; rewrite !inE => /or3P [] /eqP ]).
-    suff T : TensorSemantics denote (@tensorType Elem (exist _ x xin) (existT _ (size dims) shape)).
-      (** T, with real entries, has the type of t's dims **)
-      rewrite /ty /vnames.
-      case Etn: tn tsh => [s|] //= /eqP; rewrite -/shn => ->.
-      exact (@eq_rect _ (existT _ (size dims) shape)
-               (fun ds => TensorSemantics sem (@tensorType RealElementType real ds))
-               (Tensor (map_mx to_R (tensor_val T))) _ (dims_typeE _ _ _ shapeE)).
-    apply: theoryTensorProto.
-    have tnamed : tn by move: tsh; destruct tn.
-    pose q := qtensor_pi (TensorProto_constructor dims (Some dt) seg fd i32 sd i64 tn
-                                                  ds rd ed dl dd u64 mp).
-    have qsized : tensorProtoSized q && tensorNamed q.
-      rewrite /q /= /storage_of.
-      case: x E Hsize xin {to_R} => // E Hsize xin;
-        [have HZ := DataType_float E | have HZ := DataType_int32 E | have HZ := DataType_int64 E];
-        by rewrite HZ /= E Hsize dpos /=.
-    exists (exist _ q qsized).
-    rewrite /= /q {qsized q tnamed}.
-    have Edims : dims = map (tnth (in_tuple dims)) (fintype.enum 'I_(size dims)).
-      by rewrite map_tnth_enum.
-    case: x E Hsize xin {to_R} => // E Hsize xin;
-      [move: (DataType_float E) | move: (DataType_int32 E) | move: (DataType_int64 E)] => Z;
-      rewrite /= /storage_of Z /= E eqxx /= !andbT;
-      rewrite -map_comp; apply/eqP;
-      rewrite {1}Edims;
-      by rewrite -map_comp enumT; apply: eq_map => i /=; rewrite ffunE insubdK //; exact: pos i.
-  - (** Input: the user inputs are positional, take the one at v's position **)
-    have vin := in_inputs v (sub _ win).
-    have ilt : (seq.index v inputs < size inps)%nat by rewrite Hsz index_mem.
-    have ilt' : (seq.index v inputs < size inps')%nat by rewrite Hsz'.
-    (** network_dim_match: the input at v's position has v's declared type **)
-    have vt_ok : value_has_type (tnth (in_tuple inps) (Ordinal ilt)) v.
-      move/andP: dm => [+ _]; rewrite all2E => /andP [_ /all_nthP same].
-      have := same (tnth (in_tuple inps) (Ordinal ilt), v) (seq.index v inputs).
-      rewrite nth_zip_cond size_zip -Hsz minnn ilt => /(_ isT) /=.
-      by rewrite nth_index // -(tnth_nth _ (in_tuple inps) (Ordinal ilt)).
-    (** NetworkShapesMatch: the user input at v's position has the same dims **)
-    have vt_match : TensorShapesMatch (tnth (in_tuple inps) (Ordinal ilt))
-                                      (tnth (in_tuple inps') (Ordinal ilt')).
-      move: in_match; rewrite all2E => /andP [_ /all_nthP same].
-      have := same (tnth (in_tuple inps) (Ordinal ilt), tnth (in_tuple inps') (Ordinal ilt'))
-                   (seq.index v inputs).
-      have imin : (seq.index v inputs < minn (size inps) (size inps'))%nat by rewrite Hsz' minnn.
-      rewrite nth_zip_cond size_zip imin => /(_ isT) /=.
-      by rewrite -(tnth_nth _ (in_tuple inps) (Ordinal ilt))
-                 -(tnth_nth _ (in_tuple inps') (Ordinal ilt')).
-    move: (inp (Ordinal ilt')) vt_ok vt_match.
-    case: (tnth (in_tuple inps') (Ordinal ilt')) => ei' dsi' /= X.
-    case: (tnth (in_tuple inps) (Ordinal ilt)) => ei [ki dsi] /= /andP [_ /eqP vdims] /eqP /= Ed.
-    move: X; rewrite -Ed /= => X.
-    (** X has the type of the input's declared dims **)
-    have vsh : if (value_name v, value_dims v) is (Some s, Some ds)
-               then infer_dims nodes inputs initialisers s == Some (map int64_to_dim ds)
-               else false.
-      move: (decl v); rewrite mem_cat vin => /(_ isT) /and4P [_ _].
-      case Evn: (value_name v) => [s|] // _; case Evd: (value_dims v) => [ds|] // _.
-      by rewrite (infer_dims_input _ _ _ _ _ _ acyc vin Evn Evd) eqxx.
-    move: vsh vdims.
-    rewrite /ty /vnames /=.
-    case: (value_name v) => [nm|] //=.
-    case: (value_dims v) => [l|] //= /eqP; rewrite -/shn => -> [vdims].
-    exact (@eq_rect _ (existT _ ki dsi)
-             (fun ds => TensorSemantics sem (@tensorType RealElementType real ds))
-             X _ (dims_typeE _ _ _ (esym vdims))).
-  - (** Output **)
-    by move: (sub _ win); rewrite no_output.
-(** onnx_evaluator: evaluate the output vertex **)
-have := outs_one o oin; rewrite -/(graph_items nodes inputs initialisers) Hv.
-case: o oin oname otype => [[nm|] ot od om] oin oname otype //=.
+(** the user input at a graph input's position has the input's declared dims **)
+have Hxs : forall v ds, v \in inputs -> value_dims v = Some ds ->
+    exists u0, [/\ nth None (map Some [seq tv_of_sem _ (inp i) | i <- fintype.enum 'I_(size inps')])
+                     (seq.index v inputs) = Some u0,
+                   tag u0 = map int64_to_dim ds &
+                   all (fun d => 0 < d)%nat (tag u0)].
+  move=> v ds vin Evd.
+  have ilt : (seq.index v inputs < size inps)%nat by rewrite Hsz index_mem.
+  have ilt' : (seq.index v inputs < size inps')%nat by rewrite Hsz'.
+  have vt_ok : value_has_type (tnth (in_tuple inps) (Ordinal ilt)) v.
+    move/andP: dm => [+ _]; rewrite all2E => /andP [_ /all_nthP same].
+    have := same (tnth (in_tuple inps) (Ordinal ilt), v) (seq.index v inputs).
+    rewrite nth_zip_cond size_zip -Hsz minnn ilt => /(_ isT) /=.
+    by rewrite nth_index // -(tnth_nth _ (in_tuple inps) (Ordinal ilt)).
+  have vt_match : TensorShapesMatch (tnth (in_tuple inps) (Ordinal ilt))
+                                    (tnth (in_tuple inps') (Ordinal ilt')).
+    move: in_match; rewrite all2E => /andP [_ /all_nthP same].
+    have := same (tnth (in_tuple inps) (Ordinal ilt), tnth (in_tuple inps') (Ordinal ilt'))
+                 (seq.index v inputs).
+    have imin : (seq.index v inputs < minn (size inps) (size inps'))%nat by rewrite Hsz' minnn.
+    rewrite nth_zip_cond size_zip imin => /(_ isT) /=.
+    by rewrite -(tnth_nth _ (in_tuple inps) (Ordinal ilt))
+               -(tnth_nth _ (in_tuple inps') (Ordinal ilt')).
+  pose u0 := tv_of_sem _ (inp (Ordinal ilt')).
+  exists u0; split.
+  - have En : nth (Ordinal ilt') (fintype.enum 'I_(size inps')) (seq.index v inputs) = Ordinal ilt'
+      := nth_ord_enum (Ordinal ilt') (Ordinal ilt').
+    have Some_nth (s : seq (@tv R)) k : (k < size s)%nat ->
+        nth None (map Some s) k = Some (nth u0 s k).
+      by elim: s k => //= a s IH [|k] //= /IH.
+    rewrite Some_nth; first by rewrite size_map size_enum_ord.
+    congr Some; rewrite /u0 (nth_map (Ordinal ilt')); first by rewrite size_enum_ord.
+    by rewrite En.
+  - rewrite /u0 tag_tv_of_sem.
+    move: vt_ok vt_match; rewrite /value_has_type Evd /= => /andP [_ /eqP [E]] /eqP Ed.
+    by rewrite E /dims_seq -Ed.
+  - by rewrite /u0 tag_tv_of_sem; exact: dims_seq_pos.
+have decl' i : i \in inputs -> (value_name i != None) && (value_dims i != None).
+  by move=> iin; move: (decl i); rewrite mem_cat iin => /(_ isT) /and4P [_ _ -> ->].
+have init' t : t \in initialisers -> tensorProtoSized t && (tensor_name t != None).
+  by move/init_ok => /and3P [_ -> ->].
 (** model_well_formed: the output names exactly one vertex, a node **)
-case F: (find_vertex vertices nm) => [|w [|? ?]] //; last by case: w F.
+have Hone := outs_one o oin.
+case: o oin oname otype Hone => [[nm|] ot od om] oin oname otype Hone; last by [].
+subst u.
+have {Hone} : if find_vertex (graph_items nodes inputs initialisers) nm is [:: node _]
+              then true else false := Hone.
+case F: (find_vertex (graph_items nodes inputs initialisers) nm) => [|w [|? ?]] //; last by case: w F.
 case: w F => // n F _.
 have win := finds_in F.
-have ac : acyclic_at vertices (node n).
-  by move: (graph_acyclic_at (node n) acyc); rewrite Hv => /(_ win).
-have Y := go (size vertices) vertices (node n) erefl win (fun _ x => x) ac.
-(** Y has the type of the output's declared dims, which are d1's, which are d2's **)
-move: Y; rewrite /ty (sh_find _ _ _ (fun _ x => x) F) => Y.
+have ac := graph_acyclic_at (node n) acyc win.
+rewrite /real_name_eval /name_eval; cbv beta iota zeta delta [value_info_name]; rewrite F /input_tvs; cbv beta iota.
+have [v [ds [E S Tv _]]] := graph_eval_fits real_ops read_init_R read_init_R_sized
+  nodes inputs initialisers _ _ erefl acyc decl' init' nodes_ok Hxs _ _ (node n) (leqnSn _)
+  (fun _ x => x) win ac.
+rewrite E.
+(** the value has the output's declared dims, which are d1's, which are d2's **)
+move: S; rewrite (graph_dims_find nodes inputs initialisers _ _ _ _ nodes_ok (fun _ x => x) F).
 set ov := ValueInfoProto_constructor (Some nm) ot od om in oin otype *.
 move: (o_sh _ oin) otype; cbv beta; rewrite /value_has_type (_ : value_name ov = Some nm) //.
-case: (value_dims ov) => [l|] //= /eqP sh /andP [_ /eqP [odims]].
-have HT : tensorDims _ d1 = dims_type (map int64_to_dim l).
-  by case: (tensorDims _ d1) odims => kd dsd /= odims; exact: dims_typeE (esym odims).
-rewrite /shn sh in Y.
-case: d2 d12 => e2 dims2 /eqP /= Ed; rewrite -Ed.
-exact (@eq_rect _ (dims_type (map int64_to_dim l))
-         (fun ds => TensorSemantics sem (@tensorType RealElementType real ds))
-         Y _ (esym HT)).
-Defined.
+case: (value_dims ov) => [l|] //= /eqP -> /andP [_ /eqP [odims]] [Eds].
+by apply/eqP; rewrite Tv -Eds odims /dims_seq -(eqP d12).
+Qed.
+
+Definition sem_of_value (d : TensorType RealElementType) (o : option (@tv R))
+  : value_fits (projT2 (tensorDims _ d)) o -> TensorSemantics (@realElementTypeInterp R) d :=
+  match d with
+  | tensorType _ (existT _ dims) => @tensor_of_value _ dims o
+  end.
+
+Definition realSemantics : @RealNetworkSemantics syntax_inst R :=
+  fun y1 y2 d1 d2 u m sm inp out d12 =>
+    sem_of_value d2 _ (real_name_eval_fits y1 y2 d1 d2 u m sm inp out d12).
 
 (* Section RealEvaluator. *)
 (* Context (r : realType). *)

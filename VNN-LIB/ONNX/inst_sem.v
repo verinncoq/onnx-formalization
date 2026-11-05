@@ -143,7 +143,7 @@ case/and5P: wf => acyc /allP outs_one /allP decl /allP init_ok /and3P [/allP nod
 have vop n : node n \in vertices -> valid_op n.
   by rewrite -Hv mem_graph_items_node => /nodes_ok /node_dims_ok_valid_op.
 have sized t : tensor t \in vertices -> tensorProtoSized t.
-  by rewrite -Hv mem_graph_items_tensor => /init_ok /andP [].
+  by rewrite -Hv mem_graph_items_tensor => /init_ok /and3P [].
 have in_inputs i : input i \in vertices -> i \in inputs.
   by rewrite -Hv mem_graph_items_input.
 have no_output v : output v \in vertices = false.
@@ -158,7 +158,7 @@ have nodes_sh : all (node_dims_ok shn) nodes by apply/allP.
 (** the graph dtype is the dtype of d **)
 have dtE : (if outputs is o' :: _ then value_tensor_type o' else None) =
            Some (tag (tensorTypes _ d)).
-  move: (decl o); rewrite mem_cat oin orbT => /(_ isT) /andP [_ /eqP <-].
+  move: (decl o); rewrite mem_cat oin orbT => /(_ isT) /and4P [_ /eqP <- _ _].
   by case/andP: otype => /eqP.
 have elemE (x : Elem) : Some (tag x) = Some (tag (tensorTypes _ d)) -> x = tensorTypes _ d.
   by move=> [] /val_inj.
@@ -233,7 +233,8 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
         rewrite /ty (sh_find _ _ _ sub Fa) (sh_find _ _ _ sub Fb) /vnames /node_outputs.
         case/node_dims_ok_gemm2: Nn => da [db [ds [-> -> /gemm_out_dimsP + ->]]].
         case: (get_gemm_attributes attrs) => [[[alpha beta] tA] tB] [sa sb inner -> _] A B.
-        apply: (mx_tensor (trans_dims tA (mat_of_dims da)).1 (trans_dims tB (mat_of_dims db)).2).
+        apply: (@tensor_of_mx _ _ (mx_shape_num (dim_pos (trans_dims tA (mat_of_dims da)).1)
+                                 (dim_pos (trans_dims tB (mat_of_dims db)).2))).
         pose ops := gemm_ops alpha.
         (** transpose A and B as transA, transB say, then A' * B' **)
         move: inner A B; rewrite /trans_dims.
@@ -265,7 +266,8 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
         case/node_dims_ok_gemm3: Nn => da [db [dc [ds [-> -> -> /gemm_out_dimsP + ->]]]].
         case: (get_gemm_attributes attrs) => [[[alpha beta] tA] tB] [sa sb inner -> cok] A B C.
         have sc : (size dc <= 2)%nat by move: cok; case: (mat_of_dims dc) => ? ? /andP [].
-        apply: (mx_tensor (trans_dims tA (mat_of_dims da)).1 (trans_dims tB (mat_of_dims db)).2).
+        apply: (@tensor_of_mx _ _ (mx_shape_num (dim_pos (trans_dims tA (mat_of_dims da)).1)
+                                 (dim_pos (trans_dims tB (mat_of_dims db)).2))).
         pose ops := gemm_ops alpha.
         pose beta' := (gemm_ops beta).2.
         (** C broadcast to (N, P): a dimension of size 1 always reads index 0 **)
@@ -363,7 +365,7 @@ have go : forall (depth : nat) (its : seq vertex) (w : vertex),
     case: (tnth (in_tuple inps) (Ordinal ilt)) => ei [ki dsi] /= X /andP [/eqP vdt /eqP vdims].
     have eiE : ei = tensorTypes _ d.
       apply: elemE; rewrite -vdt -dtE.
-      by move: (decl v); rewrite mem_cat vin => /(_ isT) /andP [_ /eqP].
+      by move: (decl v); rewrite mem_cat vin => /(_ isT) /and4P [_ /eqP].
     (** X has the type of the input's declared dims **)
     have vsh : if (value_name v, value_dims v) is (Some s, Some ds)
                then infer_dims nodes inputs initialisers s == Some (map int64_to_dim ds)
