@@ -16,7 +16,7 @@ Definition relu_float32 (f: float32) : float32 :=
   | Binary.B754_finite _ _ sign _ _ _ =>  (*f is finite*)
     match sign with
     | true => (*f is less than zero, result is zero*)
-      Binary.binary_normalize 24 128 eq_refl eq_refl mode_NE 0 0 true
+      Binary.binary_normalize 24 128 eq_refl eq_refl mode_NE 0 0 false
     | false => (*f is more or equal zero, result is f*)
       f
     end
