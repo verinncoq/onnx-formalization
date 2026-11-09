@@ -185,8 +185,10 @@ pose gemm_ops (alpha : float32) : denote (tensorTypes _ d) *
 pose relu_ops : denote (tensorTypes _ d) *
     (denote (tensorTypes _ d) -> denote (tensorTypes _ d) -> bool) :=
   ltac:(case: (tensorTypes _ d) => [[] xin];
-        first [ exact (Binary.binary_normalize 24 128 erefl erefl BinarySingleNaN.mode_NE 0 0 true,
-                       fun x y : float32 => if x is Binary.B754_finite true _ _ _ then (if Binary.Bcompare 24 128 x y is Some Lt then true else false) else false)
+        first [ exact (Binary.binary_normalize 24 128 erefl erefl BinarySingleNaN.mode_NE 0 0 false,
+                       fun x y : float32 => if x is Binary.B754_infinity _ _ true then true
+                                            else if x is Binary.B754_finite true _ _ _ then (if Binary.Bcompare 24 128 x y is Some Lt then true else false)
+                                            else false)
               | exact (int32_of_Z 0, fun x y => (Z_of_int32 x <? Z_of_int32 y)%Z)
               | exact (int64_of_Z 0, fun x y => (Z_of_int64 x <? Z_of_int64 y)%Z)
               | by exfalso; move: xin; rewrite !inE => /or3P [] /eqP ]).
