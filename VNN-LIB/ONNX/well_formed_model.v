@@ -2860,6 +2860,12 @@ Definition bidx (x k : nat) : 'I_(dimc x) :=
   | false => fun _ => Ordinal (dimc_gt0 x)
   end erefl.
 
+Definition valid_opset (opset : OperatorSetIdProto) : bool :=
+match opset with
+| OperatorSetIdProto_constructor _ (Some ops) => int64_eq ops (int64_of_Z 23)
+| _ => false
+end.
+
 (** * Well-formed models
 
     A model is well formed when its graph is acyclic, every graph output is a
@@ -2872,7 +2878,8 @@ Definition bidx (x k : nat) : 'I_(dimc x) :=
     no declaration.  The matrix view of Gemm is a requirement of that
     consumer alone, inside [node_out_dims]; Relu accepts any rank. *)
 Definition model_well_formed (m : ModelProto) : bool :=
-  if m is ModelProto_constructor _ _ _ _ _ _ _ (Some graph) _ _ _ _ then
+  if m is ModelProto_constructor _ [:: opset] _ _ _ _ _ (Some graph) _ _ _ _ then
+    valid_opset opset &&
   let : GraphProto_constructor nodes _ initialisers _ _ inputs outputs _ _ _ := graph in
   let items := graph_items nodes inputs initialisers in
   let dt := if outputs is o :: _ then value_tensor_type o else None in
@@ -2883,8 +2890,11 @@ Definition model_well_formed (m : ModelProto) : bool :=
       all (fun x => if value_name x is Some s then
                       if find_vertex items s is [:: node _] then true else false
                     else false) outputs,
-      (** inputs and outputs are named, declare their dims, and share one dtype dt **)
-      all (fun v => [&& value_tensor_type v != None, value_tensor_type v == dt,
+      (** inputs and outputs have a supported dtype and positive dims, are named,
+          declare their dims, and share one dtype dt **)
+      all (fun v => [&& if value_tensor_type v is Some t then t \in supported_types else false,
+                        all (fun x => 0 < int64_to_dim x)%nat (odflt [::] (value_dims v)),
+                        value_tensor_type v != None, value_tensor_type v == dt,
                         value_name v != None & value_dims v != None]) (inputs ++ outputs),
       (** initialisers are named, have dtype dt, and their data fills their dims **)
       all (fun t => [&& tensor_dtype t == dt, tensorProtoSized t & tensor_name t != None])
@@ -2916,7 +2926,9 @@ Lemma well_formed_computes (m : ModelProto) (xs : seq TensorProto)
 Proof.
 move=> inputs_sized inputs_dt xs_sh in_one H.
 rewrite /onnx_evaluator.
-case: m inputs_dt xs_sh in_one H => ir opset prod_name prod_vers domain model_version doc [[nodes name initialisers sparse_initialisers doc_string inputs outputs value_info quantisation metadata_props]|//] metadata training functions config inputs_dt xs_sh in_one well_formed /=.
+case: m inputs_dt xs_sh in_one H => ir [//|[opdomain [opset|//]] [|//]] prod_name prod_vers domain model_version doc [[nodes name initialisers sparse_initialisers doc_string inputs outputs value_info quantisation metadata_props]|//] metadata training functions config inputs_dt xs_sh in_one /andP [Hops well_formed] /=.
+rewrite /= in Hops.
+rewrite Hops.
 rewrite isSuccess_map.
 rewrite all_map.
 apply/allP => /= x xin.
@@ -2934,7 +2946,7 @@ have w2 : all valid_op nodes.
   by apply/allP => n /(allP nodes_sh); exact: node_dims_ok_valid_op.
 have w4 : all tensorProtoSized initialisers.
   by apply/allP => t /(allP init_ok) /and3P [].
-have := allP decl x; rewrite mem_cat xin orbT => /(_ isT) /and4P [xdt_ne /eqP xdt _ _].
+have := allP decl x; rewrite mem_cat xin orbT => /(_ isT) /and3P [_ _ /and4P [xdt_ne /eqP xdt _ _]].
 rewrite -xdt in w5.
 have init_dt : all (fun t => tensor_dtype t == value_tensor_type x) initialisers.
   by rewrite xdt; apply/allP => t /(allP init_ok) /and3P [].
@@ -2950,7 +2962,7 @@ have in_sh : forall i, i \in inputs -> forall nm u, value_name i = Some nm -> u 
     tensor_has_name nm u ->
     infer_dims nodes inputs initialisers nm = Some (map int64_to_dim (get_dims u)).
   move=> i iin nm u E ux hn.
-  have := allP decl i; rewrite mem_cat iin => /(_ isT) /and4P [_ _ _].
+  have := allP decl i; rewrite mem_cat iin => /(_ isT) /and3P [_ _ /and4P [_ _ _]].
   case Ed: (value_dims i) => [ds|] // _.
   move: (allP xs_sh i iin); rewrite E => /allP /(_ u ux); rewrite hn Ed /= => /eqP [e].
   by rewrite (infer_dims_input _ _ _ _ _ _ w3 iin E Ed) e.
@@ -2964,7 +2976,7 @@ case E: (find_vertex _ xname) => [|x [|? ?]] //; last by case: x E.
 move=> _; move: E => /[dup] /finds_in.
 rewrite /graph_items H => xin.
 rewrite /find_vertex => ->.
-move=> {x' x'' xin' xname xtype xstring xmeta ir opset prod_name prod_vers domain model_version doc name doc_string value_info quantisation metadata_props metadata training functions config}.
+move=> {Hops x' x'' xin' xname xtype xstring xmeta ir opset prod_name prod_vers domain model_version doc name doc_string value_info quantisation metadata_props metadata training functions config}.
 move/graph_acyclic_at:w3.
 rewrite /= /graph_items H=> /(_ x xin) w3.
 have {w2 w3 w4 w5} well_formed := (And4 w2 w3 w4 w5).
@@ -3070,6 +3082,7 @@ case: x xin well_formed IHk => [n|t|v|v] /= xin well_formed IHk.
   by case: (filter (tensor_has_name nm) xs) => [|u [|? ?]].
 - (** output **)
   by move: xin; rewrite -H -/(graph_items _ _ _) output_notin_graph_items.
+by move: Hops.
 Qed.
 
 Definition well_formed_model (d : NetworkType Elem) : eqType :=

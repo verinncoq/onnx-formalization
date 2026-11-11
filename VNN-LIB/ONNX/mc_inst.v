@@ -195,6 +195,8 @@ Qed.
 
 HB.instance Definition _ := hasDecEq.Build string stringEqP.
 
+HB.instance Definition _ := Choice.copy string (can_type string_of_list_byte_of_string).
+
 Definition Segment_TensorProtoEq : rel Segment_TensorProto :=
   fun s1 s2 =>
     match s1, s2 with
