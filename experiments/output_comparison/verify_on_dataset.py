@@ -7,7 +7,7 @@ import sys
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Find the project root by looking for the .git directory or dune-project file
-# Dune copies files to _build/ and runs them from there, so we cannot rely on
+# Dune copies files to _build/ and runs them from there, so we can't rely on
 # hardcoded relative paths from this script's location.
 def find_project_root(start_path):
     current = start_path
