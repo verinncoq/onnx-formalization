@@ -158,15 +158,22 @@ Fixpoint onnx_evaluator_recursive (depth: nat) (user_inputs: list TensorProto) (
 (*Calls the recursive implementation of the onnx_evaluator on a model's graph*)
 Definition onnx_evaluator (model: ModelProto) (user_inputs: list TensorProto) : error_option (list TensorProto) :=
   match model with
-  | ModelProto_constructor _ _ _ _ _ _ _ graph_option _ _ _ _ =>
-    match graph_option with
-    | Some graph => match graph with
-      | GraphProto_constructor nodes _ initializers _ _ inputs outputs _ _ _ =>
-        let vertices := (map (fun x => node x) (rev nodes)) ++ (map (fun x => input x) inputs) ++ (map (fun x => tensor x) initializers) in
-        let evaluate := onnx_evaluator_recursive (length vertices) user_inputs vertices in
-        let output_vertices := map (fun x => output x) outputs in
-        list_error_option_to_error_option_list (map evaluate output_vertices)
-      end
-    | None => Error "ONNX Evaluator: Model must define a graph"
+  | ModelProto_constructor _ opset _ _ _ _ _ graph_option _ _ _ _ =>
+      match opset with
+      | [(OperatorSetIdProto_constructor _ (Some v))] =>
+          if int64_eq v (int64_of_Z 23) then
+          match graph_option with
+          | Some graph =>
+              match graph with
+              | GraphProto_constructor nodes _ initializers _ _ inputs outputs _ _ _ =>
+                  let vertices := (map (fun x => node x) (rev nodes)) ++ (map (fun x => input x) inputs) ++ (map (fun x => tensor x) initializers) in
+                  let evaluate := onnx_evaluator_recursive (S (length vertices)) user_inputs vertices in
+                  let output_vertices := map (fun x => output x) outputs in
+                  list_error_option_to_error_option_list (map evaluate output_vertices)
+              end
+          | None => Error "ONNX Evaluator: Model must define a graph"
+          end
+            else Error "ONNX Evaluator: Wrong opset version. Only 23 is supported"
+      | _ => Error "ONNX Evaluator: No opset version defined. Only 23 is supported"
     end
   end.

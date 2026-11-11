@@ -11,14 +11,19 @@ From ONNXFormalization.ONNXConverter Require Export model.
 Definition relu_float32 (f: float32) : float32 :=
   match f with
   | Binary.B754_zero _ _ _ => f           (*f is zero*)
-  | Binary.B754_infinity _ _ _ => f       (*f is infinite*)
+  | Binary.B754_infinity _ _ sign =>      (*f is infinite*)
+    match sign with
+    | true => (*f is -inf, result is +0 (IEEE max(+0, -inf) = +0)*)
+      Binary.binary_normalize 24 128 eq_refl eq_refl mode_NE 0 0 false
+    | false => (*f is +inf, result is f*)
+      f
+    end
   | Binary.B754_nan _ _ _ _ _ => f        (*f is Nan*)
   | Binary.B754_finite _ _ sign _ _ _ =>  (*f is finite*)
     match sign with
     | true => (*f is less than zero, result is zero*)
-      Binary.binary_normalize 24 128 eq_refl eq_refl mode_NE 0 0 true
-    | false => (*f is more or equal zero, result is f*)
-      f
+      Binary.binary_normalize 24 128 eq_refl eq_refl mode_NE 0 0 false
+    | false => f (*f is more or equal zero, result is f*)
     end
   end.
 
@@ -53,14 +58,14 @@ Definition relu (X: TensorProto) : error_option TensorProto :=
             match float32_of_bytes bytes with
             | Success floats =>
               let relu := map relu_float32 floats in
-              Success (TensorProto_constructor dims (int32_of_Z 1%Z) None relu [] [] [] None None None [] None [] [] [])
+              Success (TensorProto_constructor dims (Some (int32_of_Z 1%Z)) None relu [] [] [] None None None [] None [] [] [])
             | Error e => Error e
             end
           | None => Error "TensorProto with type float32 must either have non-empty float_data or non-empty raw_data"
           end
         | floats =>
         let relu := map relu_float32 floats in
-        Success (TensorProto_constructor dims (int32_of_Z 1%Z) None relu [] [] [] None None None [] None [] [] [])
+        Success (TensorProto_constructor dims (Some (int32_of_Z 1%Z)) None relu [] [] [] None None None [] None [] [] [])
         end
 
       | 6%Z => (*int32*)
@@ -71,14 +76,14 @@ Definition relu (X: TensorProto) : error_option TensorProto :=
             match int32_of_bytes bytes with
             | Success ints =>
               let relu := map relu_int32 ints in
-              Success (TensorProto_constructor dims (int32_of_Z 1%Z) None [] relu [] [] None None None [] None [] [] [])
+              Success (TensorProto_constructor dims (Some (int32_of_Z 6%Z)) None [] relu [] [] None None None [] None [] [] [])
             | Error e => Error e
             end
           | None => Error "TensorProto with type int32 must either have non-empty int32_data or non-empty raw_data"
           end
         | ints =>
         let relu := map relu_int32 ints in
-        Success (TensorProto_constructor dims (int32_of_Z 1%Z) None [] relu [] [] None None None [] None [] [] [])
+        Success (TensorProto_constructor dims (Some (int32_of_Z 6%Z)) None [] relu [] [] None None None [] None [] [] [])
         end
 
       | 7%Z => (*int64*)
@@ -89,14 +94,14 @@ Definition relu (X: TensorProto) : error_option TensorProto :=
             match int64_of_bytes bytes with
             | Success ints =>
               let relu := map relu_int64 ints in
-              Success (TensorProto_constructor dims (int32_of_Z 1%Z)  None [] [] [] relu None None None [] None [] [] [])
+              Success (TensorProto_constructor dims (Some (int32_of_Z 7%Z))  None [] [] [] relu None None None [] None [] [] [])
             | Error e => Error e
             end
           | None => Error "TensorProto with type int64 must either have non-empty int_data or non-empty raw_data"
           end
         | ints =>
         let relu := map relu_int64 ints in
-        Success (TensorProto_constructor dims (int32_of_Z 1%Z)  None [] [] [] relu None None None [] None [] [] [])
+        Success (TensorProto_constructor dims (Some (int32_of_Z 7%Z))  None [] [] [] relu None None None [] None [] [] [])
         end
       | _ => Error "ReLU: Tensor Datatype must either be float32, int32 or int64"
       end

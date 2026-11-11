@@ -1,0 +1,4 @@
+(rule
+ (alias runtest)
+ (deps output_comparison/verify_on_dataset.py (glob_files output_comparison/dataset/*.onnx))
+ (action (run python3 output_comparison/verify_on_dataset.py)))

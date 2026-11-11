@@ -42,6 +42,10 @@ Fixpoint convert_to_row_major {T: Type} (m: matrix T) : list T :=
   | h::t => h ++ (convert_to_row_major t)
   end.
 
+(*computes the logical AND of all elements in a bool matrix*)
+Definition matrix_and (m: matrix bool) : bool :=
+  fold_left andb (convert_to_row_major m) true.
+
 (*with the help of chat-gpt; returns the j'th column of m*)
 Fixpoint get_column {T: Type} (m : matrix T) (j : nat) : error_option (list T) :=
   match m with
@@ -223,6 +227,9 @@ Fixpoint matrix_addition_float32 (a b : matrix float32) : error_option (matrix f
   | _, _ => Error "Matrix addition: matrices must have the same shape"
   end.
 
+Definition scale_list_float32 (a : list float32) (s : float32) : list float32 :=
+  map (b32_mult mode_NE s) a.
+
 (*scales the matrix by a factor s*)
 Definition scale_matrix_float32 (a: matrix float32) (s: float32) : matrix float32 :=
   map (map (b32_mult mode_NE s)) a.
@@ -231,7 +238,77 @@ Definition scale_matrix_float32 (a: matrix float32) (s: float32) : matrix float3
 Definition string_matrix_of_matrix_float32 (m: matrix float32) : matrix string :=
   map (map string_of_float32) m.
 
+(*pointwise comparison operators for float32, following IEEE-754 semantics via
+  b32_compare: NaN compares unordered, so eq/lt/le/gt/ge are false and neq is
+  true whenever either operand is NaN*)
 
+Section Binary.
+Context {prec emax : Z}.
+
+Definition binary_eq (x y : Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Eq => true
+  | _ => false
+  end.
+
+Definition binary_neq (x y: Binary.binary_float prec emax) : bool := negb (binary_eq x y).
+
+Definition binary_lt (x y: Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Lt => true
+  | _ => false
+  end.
+
+Definition binary_le (x y: Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Lt | Some Eq => true
+  | _ => false
+  end.
+
+Definition binary_gt (x y: Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Gt => true
+  | _ => false
+  end.
+
+Definition binary_ge (x y: Binary.binary_float prec emax) : bool :=
+  match Binary.Bcompare prec emax x y with
+  | Some Gt | Some Eq => true
+  | _ => false
+  end.
+
+(*computes the pairwise comparison of two lists, using op to compare elements*)
+Fixpoint compare_lists_binary
+(op: Binary.binary_float prec emax -> Binary.binary_float prec emax -> bool)
+(a b: list (Binary.binary_float prec emax))
+  : error_option (list bool) :=
+  match a, b with
+  | [], [] => Success []
+  | h1::t1, h2::t2 => match compare_lists_binary op t1 t2 with
+    | Success recursive => Success ((op h1 h2)::recursive)
+    | Error e => Error e
+    end
+  | _, _ => Error "Compare lists: lists must have the same length"
+  end.
+
+(*computes the pairwise comparison of two matrices, using op to compare elements*)
+Fixpoint matrix_compare_binary
+(op: Binary.binary_float prec emax -> Binary.binary_float prec emax -> bool)
+(a b: matrix (Binary.binary_float prec emax))
+  : error_option (matrix bool) :=
+  match a, b with
+  | [], [] => Success []
+  | ha::ta, hb::tb => match compare_lists_binary op ha hb with
+    | Success new => match matrix_compare_binary op ta tb with
+      | Success recursive => Success (new::recursive)
+      | Error e => Error e
+      end
+    | Error e => Error e
+    end
+  | _, _ => Error "Matrix comparison: matrices must have the same shape"
+  end.
+
+End Binary.
 
 (*int32*)
 
@@ -244,10 +321,7 @@ Fixpoint list_product_int32 (a b : list int32) : error_option int32 :=
     match list_product_int32 xs ys with
     | Success recursive =>
       let result := Z_x * Z_y + (Z_of_int32 recursive) in
-      match int32_of_Z result with
-      | Some f => Success f
-      | None => Error "Dot product between two int32 yields to infinity or NaN"
-      end
+      Success (int32_of_Z result)
     | Error e => Error e
     end
   | [], [] => Success (Byte.x00, Byte.x00, Byte.x00, Byte.x00)
@@ -285,10 +359,9 @@ Fixpoint add_lists_int32 (a b: list int32) : error_option (list int32) :=
   match a, b with
   | [], [] => Success []
   | h1::t1, h2::t2 => match add_lists_int32 t1 t2 with
-    | Success recursive => match int32_of_Z ((Z_of_int32 h1) + (Z_of_int32 h2)) with
-      | Some new => Success (new::recursive)
-      | None => Error "Addition between two int32 yields to infinity or NaN"
-      end
+    | Success recursive =>
+      let new := int32_of_Z ((Z_of_int32 h1) + (Z_of_int32 h2)) in
+      Success (new::recursive)
     | Error e => Error e
     end
   | _, _ => Error "Add lists: lists must have the same length"
@@ -308,21 +381,54 @@ Fixpoint matrix_addition_int32 (a b : matrix int32) : error_option (matrix int32
   | _, _ => Error "Matrix addition: matrices must have the same shape"
   end.
 
+Definition scale_list_int32 (a : list int32) (s : int32) : list int32 :=
+  let z_list := map Z_of_int32 a in
+  let scaled_z_list := map (Z.mul (Z_of_int32 s)) z_list in
+  map int32_of_Z scaled_z_list.
+
 (*scales the matrix by a factor s*)
-Definition scale_matrix_int32 (a: matrix int32) (s: int32) : error_option (matrix int32) :=
+Definition scale_matrix_int32 (a: matrix int32) (s: int32) : matrix int32 :=
   let z_matrix := map (map Z_of_int32) a in
   let scaled_z_matrix := map (map (Z.mul (Z_of_int32 s))) z_matrix in
-  let result_option := map (map int32_of_Z) scaled_z_matrix in
-  match option_list_of_list_option 
-    (map option_list_of_list_option result_option)
-  with  
-  | Some result => Success result
-  | None => Error "Matrix scaling results in overflow"
-  end.
+  map (map int32_of_Z) scaled_z_matrix.
 
 (*converts the whole matrix into a readable string*)
 Definition string_matrix_of_matrix_int32 (m: matrix int32) : matrix string :=
   map (map string_of_int32) m.
+
+(*pointwise comparison operators for int32*)
+
+Definition int32_eq (x y: int32) : bool := Z.eqb (Z_of_int32 x) (Z_of_int32 y).
+Definition int32_neq (x y: int32) : bool := negb (int32_eq x y).
+Definition int32_lt (x y: int32) : bool := Z.ltb (Z_of_int32 x) (Z_of_int32 y).
+Definition int32_le (x y: int32) : bool := Z.leb (Z_of_int32 x) (Z_of_int32 y).
+Definition int32_gt (x y: int32) : bool := Z.ltb (Z_of_int32 y) (Z_of_int32 x).
+Definition int32_ge (x y: int32) : bool := Z.leb (Z_of_int32 y) (Z_of_int32 x).
+
+(*computes the pairwise comparison of two lists, using op to compare elements*)
+Fixpoint compare_lists_int32 (op: int32 -> int32 -> bool) (a b: list int32) : error_option (list bool) :=
+  match a, b with
+  | [], [] => Success []
+  | h1::t1, h2::t2 => match compare_lists_int32 op t1 t2 with
+    | Success recursive => Success ((op h1 h2)::recursive)
+    | Error e => Error e
+    end
+  | _, _ => Error "Compare lists: lists must have the same length"
+  end.
+
+(*computes the pairwise comparison of two matrices, using op to compare elements*)
+Fixpoint matrix_compare_int32 (op: int32 -> int32 -> bool) (a b: matrix int32) : error_option (matrix bool) :=
+  match a, b with
+  | [], [] => Success []
+  | ha::ta, hb::tb => match compare_lists_int32 op ha hb with
+    | Success new => match matrix_compare_int32 op ta tb with
+      | Success recursive => Success (new::recursive)
+      | Error e => Error e
+      end
+    | Error e => Error e
+    end
+  | _, _ => Error "Matrix comparison: matrices must have the same shape"
+  end.
 
 
 
@@ -337,10 +443,7 @@ Fixpoint list_product_int64 (a b : list int64) : error_option int64 :=
     match list_product_int64 xs ys with
     | Success recursive =>
       let result := Z_x * Z_y + (Z_of_int64 recursive) in
-      match int64_of_Z result with
-      | Some f => Success f
-      | None => Error "Dot product between two int64 yields to infinity or NaN"
-      end
+      Success (int64_of_Z result)
     | Error e => Error e
     end
   | [], [] => Success (Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00, Byte.x00)
@@ -379,10 +482,9 @@ Fixpoint add_lists_int64 (a b: list int64) : error_option (list int64) :=
   match a, b with
   | [], [] => Success []
   | h1::t1, h2::t2 => match add_lists_int64 t1 t2 with
-    | Success recursive => match int64_of_Z ((Z_of_int64 h1) + (Z_of_int64 h2)) with
-      | Some new => Success (new::recursive)
-      | None => Error "Addition between two int64 yields to infinity or NaN"
-      end
+    | Success recursive =>
+      let new := int64_of_Z ((Z_of_int64 h1) + (Z_of_int64 h2)) in
+      Success (new::recursive)
     | Error e => Error e
     end
   | _, _ => Error "Add lists: lists must have the same length"
@@ -402,18 +504,89 @@ Fixpoint matrix_addition_int64 (a b : matrix int64) : error_option (matrix int64
   | _, _ => Error "Matrix addition: matrices must have the same shape"
   end.
 
+Definition scale_list_int64 (a : list int64) (s : int64) : list int64 :=
+  let z_list := map Z_of_int64 a in
+  let scaled_z_list := map (Z.mul (Z_of_int64 s)) z_list in
+  map int64_of_Z scaled_z_list.
+
 (*scales the matrix by a factor s*)
-Definition scale_matrix_int64 (a: matrix int64) (s: int64) : error_option (matrix int64) :=
+Definition scale_matrix_int64 (a: matrix int64) (s: int64) : matrix int64 :=
   let z_matrix := map (map Z_of_int64) a in
   let scaled_z_matrix := map (map (Z.mul (Z_of_int64 s))) z_matrix in
-  let result_option := map (map int64_of_Z) scaled_z_matrix in
-  match option_list_of_list_option 
-    (map option_list_of_list_option result_option)
-  with  
-  | Some result => Success result
-  | None => Error "Matrix scaling results in overflow"
-  end.
+  map (map int64_of_Z) scaled_z_matrix.
 
 (*converts the whole matrix into a readable string*)
 Definition string_matrix_of_matrix_int64 (m: matrix int64) : matrix string :=
   map (map string_of_int64) m.
+
+(*pointwise comparison operators for int64*)
+
+Definition int64_eq (x y: int64) : bool := Z.eqb (Z_of_int64 x) (Z_of_int64 y).
+Definition int64_neq (x y: int64) : bool := negb (int64_eq x y).
+Definition int64_lt (x y: int64) : bool := Z.ltb (Z_of_int64 x) (Z_of_int64 y).
+Definition int64_le (x y: int64) : bool := Z.leb (Z_of_int64 x) (Z_of_int64 y).
+Definition int64_gt (x y: int64) : bool := Z.ltb (Z_of_int64 y) (Z_of_int64 x).
+Definition int64_ge (x y: int64) : bool := Z.leb (Z_of_int64 y) (Z_of_int64 x).
+
+(*computes the pairwise comparison of two lists, using op to compare elements*)
+Fixpoint compare_lists_int64 (op: int64 -> int64 -> bool) (a b: list int64) : error_option (list bool) :=
+  match a, b with
+  | [], [] => Success []
+  | h1::t1, h2::t2 => match compare_lists_int64 op t1 t2 with
+    | Success recursive => Success ((op h1 h2)::recursive)
+    | Error e => Error e
+    end
+  | _, _ => Error "Compare lists: lists must have the same length"
+  end.
+
+(*computes the pairwise comparison of two matrices, using op to compare elements*)
+Fixpoint matrix_compare_int64 (op: int64 -> int64 -> bool) (a b: matrix int64) : error_option (matrix bool) :=
+  match a, b with
+  | [], [] => Success []
+  | ha::ta, hb::tb => match compare_lists_int64 op ha hb with
+    | Success new => match matrix_compare_int64 op ta tb with
+      | Success recursive => Success (new::recursive)
+      | Error e => Error e
+      end
+    | Error e => Error e
+    end
+  | _, _ => Error "Matrix comparison: matrices must have the same shape"
+  end.
+
+
+
+(*uint64*)
+
+(*pointwise comparison operators for uint64*)
+
+Definition uint64_eq (x y: uint64) : bool := Z.eqb (Z_of_uint64 x) (Z_of_uint64 y).
+Definition uint64_neq (x y: uint64) : bool := negb (uint64_eq x y).
+Definition uint64_lt (x y: uint64) : bool := Z.ltb (Z_of_uint64 x) (Z_of_uint64 y).
+Definition uint64_le (x y: uint64) : bool := Z.leb (Z_of_uint64 x) (Z_of_uint64 y).
+Definition uint64_gt (x y: uint64) : bool := Z.ltb (Z_of_uint64 y) (Z_of_uint64 x).
+Definition uint64_ge (x y: uint64) : bool := Z.leb (Z_of_uint64 y) (Z_of_uint64 x).
+
+(*computes the pairwise comparison of two lists, using op to compare elements*)
+Fixpoint compare_lists_uint64 (op: uint64 -> uint64 -> bool) (a b: list uint64) : error_option (list bool) :=
+  match a, b with
+  | [], [] => Success []
+  | h1::t1, h2::t2 => match compare_lists_uint64 op t1 t2 with
+    | Success recursive => Success ((op h1 h2)::recursive)
+    | Error e => Error e
+    end
+  | _, _ => Error "Compare lists: lists must have the same length"
+  end.
+
+(*computes the pairwise comparison of two matrices, using op to compare elements*)
+Fixpoint matrix_compare_uint64 (op: uint64 -> uint64 -> bool) (a b: matrix uint64) : error_option (matrix bool) :=
+  match a, b with
+  | [], [] => Success []
+  | ha::ta, hb::tb => match compare_lists_uint64 op ha hb with
+    | Success new => match matrix_compare_uint64 op ta tb with
+      | Success recursive => Success (new::recursive)
+      | Error e => Error e
+      end
+    | Error e => Error e
+    end
+  | _, _ => Error "Matrix comparison: matrices must have the same shape"
+  end.

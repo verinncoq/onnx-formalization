@@ -39,7 +39,7 @@ Fixpoint list_error_option_to_error_option_list {T: Type} (l: list (error_option
 
 (*Constructs a tensor with a name and values, given a dimensionality. The type is float32.*)
 Definition float_tensor (name: string) (floats: list float32) (dims: list int64) : TensorProto :=
-  TensorProto_constructor dims (int32_of_Z 1%Z) None floats [] [] [] (Some name) None None [] None [] [] [].
+  TensorProto_constructor dims (Some (int32_of_Z 1%Z)) None floats [] [] [] (Some name) None None [] None [] [] [].
 
 (*modified signature of float_tensor*)
 Definition float_tensor_wrapper (triple: string * (list float32) * (list int64)) : TensorProto :=

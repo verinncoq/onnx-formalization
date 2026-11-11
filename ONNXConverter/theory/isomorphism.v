@@ -136,7 +136,7 @@ Definition directed_edge_premodel (n1 n2: NNPremodel) : Prop :=
   | NNPremodel_initializer_matrix name1 _ _ _, NNPremodel_Output name2 _ =>
     name1 = name2
   | NNPremodel_initializer_matrix name1 _ _ _, NNPremodel_Linear _ _ weight bias _ _ => 
-    name1 = weight \/ name1 = bias
+    name1 = weight \/ bias = Some name1
   | NNPremodel_initializer_matrix name1 _ _ _, NNPremodel_ReLu _ _ =>
     False (*There cannot be a directed edge from an initializer to an relu node*)
 
@@ -147,7 +147,7 @@ Definition directed_edge_premodel (n1 n2: NNPremodel) : Prop :=
   | NNPremodel_initializer_vector name1 _ _, NNPremodel_Output name2 _ =>
     name1 = name2
   | NNPremodel_initializer_vector name1 _ _, NNPremodel_Linear _ _ weight bias _ _ =>
-    name1 = weight \/ name1 = bias
+    name1 = weight \/ bias = Some name1
   | NNPremodel_initializer_vector name1 _ _, NNPremodel_ReLu _ _ =>
     False (*There cannot be a directed edge from an initializer to an relu node*)
 
@@ -208,26 +208,46 @@ Lemma convert_gemm_returns_gemm:
   convert_NodeProto_Gemm_to_NNPremodel outputs inputs attributes = Success nnseq ->
   exists inp out w b a1 a2,
   nnseq = NNPremodel_Linear inp out w b a1 a2.
-Proof. intros. unfold convert_NodeProto_Gemm_to_NNPremodel in H. destruct outputs.
-  all: try inversion H. destruct outputs. destruct inputs. all: try inversion H.
-  destruct inputs. all: try inversion H. destruct inputs. all: try inversion H.
-  destruct inputs. all: try inversion H. destruct (get_float_attribute attributes "alpha").
-  destruct (float32_is_one f) eqn:F.
-  destruct (int64_is_zero (match get_int_attribute attributes "transA" with
+Proof. intros. unfold convert_NodeProto_Gemm_to_NNPremodel in H. destruct outputs. discriminate H.
+  destruct outputs, inputs; try (discriminate H).
+  destruct inputs. discriminate H.
+  destruct inputs.
+  - destruct (get_float_attribute attributes "alpha").
+    destruct (float32_is_one f) eqn:F.
+    destruct (int64_is_zero (match get_int_attribute attributes "transA" with
                            | Success ta => ta
                            | Error _ => default_zero
                            end)) eqn:I.
-    - inversion H. repeat eexists.
-    - inversion H.
-    - inversion H.
-    - destruct (float32_is_one default_one).
-      + destruct (int64_is_zero (match get_int_attribute attributes "transA" with
+    * do 6 eexists; inversion H; reflexivity.
+    * discriminate H.
+    * discriminate H.
+    * destruct (float32_is_one default_one).
+      -- destruct (int64_is_zero (match get_int_attribute attributes "transA" with
                                  | Success ta => ta
                                  | Error _ => default_zero
                                  end)) eqn:I.
-        * inversion H. repeat eexists.
-        * inversion H.
-      + inversion H.
+         ** do 6 eexists; inversion H; reflexivity.
+         ** discriminate H.     
+      -- discriminate H.
+  - destruct inputs.
+    destruct (get_float_attribute attributes "alpha").
+    * destruct (float32_is_one f) eqn:F.
+      -- destruct (int64_is_zero (match get_int_attribute attributes "transA" with
+                           | Success ta => ta
+                           | Error _ => default_zero
+                           end)) eqn:I.
+         ** do 6 eexists; inversion H; reflexivity.
+         ** discriminate H.
+      -- discriminate H.
+    * destruct (float32_is_one default_one) eqn:F.
+      -- destruct (int64_is_zero (match get_int_attribute attributes "transA" with
+                           | Success ta => ta
+                           | Error _ => default_zero
+                           end)) eqn:I.
+         ** do 6 eexists; inversion H; reflexivity.
+         ** discriminate H.
+      -- discriminate H.
+    * discriminate H.
 Qed.
 
 Lemma convert_node_returns_relu_or_gemm: 
@@ -347,11 +367,16 @@ Theorem node_linear_input_link: forall
   (l1 : list AttributeProto)
   (o o0 o1 o2 o3 : option string)
   (l2 l3 : list string)
-  (s s0 s1 s2 s3 s4: string),
+  (s s0 s1 : string)
+  (s2 : option string)
+  (s3 s4: string),
   (convert_vertex_to_NNPremodel (node (NodeProto_constructor l3 l2 o3 o2 o1 o0 l1 o l0 l)) =
   Success (NNPremodel_Linear s s0 s1 s2 s3 s4)) ->
-  l3 = s::s1::s2::[].
-Proof. intros. simpl in H. destruct o2.
+  match s2 with
+  | Some s2value => l3 = s::s1::s2value::[]
+  | None => l3 = s::s1::[]
+  end.
+Proof. intros. simpl in H. destruct s2. destruct o2. 
   * destruct (get_op_type s5).
     + unfold convert_NodeProto_Relu_to_NNPremodel in H. destruct l2. 
       all: try inversion H. destruct l2. all: try inversion H. destruct l3. all: try inversion H.
@@ -375,10 +400,74 @@ Proof. intros. simpl in H. destruct o2.
                     match get_float_attribute l1 "beta" with
                     | Success b => b
                     | Error _ => default_one
-                    end). all: try inversion H1. all: reflexivity.
+                    end). all: try inversion H1. all: try reflexivity.
+      destruct (float32_is_one
+        match get_float_attribute l1 "alpha" with
+        | Success a => a
+        | Error _ => default_one
+        end). destruct (int64_is_zero
+          match get_int_attribute l1 "transA" with
+          | Success ta => ta
+          | Error _ => default_zero
+          end). destruct (string_of_int64
+            match get_int_attribute l1 "transB" with
+            | Success tb => tb
+            | Error _ => default_zero
+            end). destruct (string_of_float32
+                    match get_float_attribute l1 "beta" with
+                    | Success b => b
+                    | Error _ => default_one
+                    end). all: try inversion H1. all: try reflexivity.
     + inversion H.
   * inversion H.
-  Qed.
+  * destruct o2.
+    destruct (get_op_type s2).
+    unfold convert_NodeProto_Relu_to_NNPremodel in H. destruct l2.
+    all: try discriminate H.
+    - destruct l2; try (discriminate H).
+      destruct l3; try (discriminate H).
+      destruct l3; try (discriminate H).
+    - unfold convert_NodeProto_Gemm_to_NNPremodel in H. destruct l2; try discriminate H.
+      destruct l2; try (discriminate H).
+      destruct l3; try (discriminate H).
+      destruct l3; try (discriminate H).
+      destruct l3; try (discriminate H).
+      ** destruct (float32_is_one
+        match get_float_attribute l1 "alpha" with
+        | Success a => a
+        | Error _ => default_one
+        end). destruct (int64_is_zero
+          match get_int_attribute l1 "transA" with
+          | Success ta => ta
+          | Error _ => default_zero
+          end). destruct (string_of_int64
+            match get_int_attribute l1 "transB" with
+            | Success tb => tb
+            | Error _ => default_zero
+            end). destruct (string_of_float32
+                    match get_float_attribute l1 "beta" with
+                    | Success b => b
+                    | Error _ => default_one
+                    end). all: try inversion H. all: try reflexivity.
+      ** destruct l3; try (discriminate H).
+         destruct (float32_is_one
+        match get_float_attribute l1 "alpha" with
+        | Success a => a
+        | Error _ => default_one
+        end). destruct (int64_is_zero
+          match get_int_attribute l1 "transA" with
+          | Success ta => ta
+          | Error _ => default_zero
+          end). destruct (string_of_int64
+            match get_int_attribute l1 "transB" with
+            | Success tb => tb
+            | Error _ => default_zero
+            end). destruct (string_of_float32
+                    match get_float_attribute l1 "beta" with
+                    | Success b => b
+                    | Error _ => default_one
+                    end). all: try inversion H.
+Qed.
 
 Theorem node_relu_input_link: forall
   (l : list NodeDeviceConfigurationProto)
@@ -415,6 +504,23 @@ Proof. intros. simpl in H. destruct o2.
                     | Success b => b
                     | Error _ => default_one
                     end). all: try inversion H1.
+      destruct (float32_is_one
+        match get_float_attribute l1 "alpha" with
+        | Success a => a
+        | Error _ => default_one
+        end). destruct (int64_is_zero
+          match get_int_attribute l1 "transA" with
+          | Success ta => ta
+          | Error _ => default_zero
+          end). destruct (string_of_int64
+            match get_int_attribute l1 "transB" with
+            | Success tb => tb
+            | Error _ => default_zero
+            end). destruct (string_of_float32
+                    match get_float_attribute l1 "beta" with
+                    | Success b => b
+                    | Error _ => default_one
+                    end). all: try inversion H1.
     + inversion H.
   * inversion H.
   Qed.
@@ -425,7 +531,9 @@ Theorem node_linear_output_link: forall
   (l1 : list AttributeProto)
   (o o0 o1 o2 o3 : option string)
   (l2 l3 : list string)
-  (s s0 s1 s2 s3 s4: string),
+  (s s0 s1 : string)
+  (s2 : option string)
+  (s3 s4: string),
   (convert_vertex_to_NNPremodel (node (NodeProto_constructor l3 l2 o3 o2 o1 o0 l1 o l0 l)) =
   Success (NNPremodel_Linear s s0 s1 s2 s3 s4)) ->
   l2 = [s0].
@@ -453,10 +561,27 @@ Proof. intros. simpl in H. destruct o2.
                     match get_float_attribute l1 "beta" with
                     | Success b => b
                     | Error _ => default_one
-                    end). all: try inversion H1; reflexivity.
+                    end). all: try (inversion H1; reflexivity).
+      destruct (float32_is_one
+        match get_float_attribute l1 "alpha" with
+        | Success a => a
+        | Error _ => default_one
+        end). destruct (int64_is_zero
+          match get_int_attribute l1 "transA" with
+          | Success ta => ta
+          | Error _ => default_zero
+          end). destruct (string_of_int64
+            match get_int_attribute l1 "transB" with
+            | Success tb => tb
+            | Error _ => default_zero
+            end). destruct (string_of_float32
+                    match get_float_attribute l1 "beta" with
+                    | Success b => b
+                    | Error _ => default_one
+                    end). all: try (inversion H1; reflexivity).
     + inversion H.
   * inversion H.
-  Qed.
+Qed.
 
 Theorem node_relu_output_link: forall
   (l : list NodeDeviceConfigurationProto)
@@ -493,9 +618,26 @@ Proof. intros. simpl in H. destruct o2.
                     | Success b => b
                     | Error _ => default_one
                     end). all: try inversion H1.
+      destruct (float32_is_one
+        match get_float_attribute l1 "alpha" with
+        | Success a => a
+        | Error _ => default_one
+        end). destruct (int64_is_zero
+          match get_int_attribute l1 "transA" with
+          | Success ta => ta
+          | Error _ => default_zero
+          end). destruct (string_of_int64
+            match get_int_attribute l1 "transB" with
+            | Success tb => tb
+            | Error _ => default_zero
+            end). destruct (string_of_float32
+                    match get_float_attribute l1 "beta" with
+                    | Success b => b
+                    | Error _ => default_one
+                    end). all: try inversion H1.
     + inversion H.
   * inversion H.
-  Qed.
+Qed.
 
 
 Theorem tensor_matrix_link: forall
@@ -690,8 +832,12 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
         +++ (*interesting: v1 and v2 are node, n1 and n2 are Linear*)
             simpl in ISO. destruct n. destruct n0. simpl.
             apply node_linear_output_link in H1. apply node_linear_input_link in H2.
-            rewrite H1 in ISO. simpl in ISO. destruct l8. rewrite H2 in ISO. rewrite ISO. reflexivity.
-             rewrite H2 in ISO. rewrite ISO. reflexivity.
+            rewrite H1 in ISO. simpl in ISO. destruct l8. destruct o0. 
+            -- rewrite H2 in ISO. rewrite ISO. reflexivity.
+            -- rewrite H2 in ISO. rewrite ISO. reflexivity.
+            -- destruct o0.
+               ** rewrite H2 in ISO. rewrite ISO. reflexivity.
+               ** rewrite H2 in ISO. rewrite ISO. reflexivity.
         +++ (*interesting: v1 and v2 are node, n1 is Linear, n2 is ReLu*)
             simpl in ISO. destruct n. destruct n0. simpl.
             apply node_linear_output_link in H1. apply node_relu_input_link in H2.
@@ -701,24 +847,24 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
       ++ simpl in ISO. inversion ISO.
       ++ simpl in ISO. inversion ISO.
       ++ destruct n2.
-        +++ simpl in H2. destruct v. destruct o.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
+            ** apply (convert_valueInfo_returns_output) in H2. destruct H2. inversion H.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
-            ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
+            ** simpl in H2. destruct type_v. all: inversion H2.
         +++ (*interesting: v1 is node, v2 is output, n1 is Linear, n2 is output*)
-            simpl in H2. destruct v. destruct o.
+            simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
             simpl in ISO. destruct n. apply node_linear_output_link in H1. simpl.
             rewrite H1 in ISO. simpl in ISO. destruct ISO. apply H0. inversion H0.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
+            ** simpl in H2. destruct type_v. all: inversion H2.
     + destruct v2.
       ++ destruct n2.
         +++ simpl in H2. apply convert_node_returns_relu_or_gemm in H2. destruct H2.
@@ -734,8 +880,8 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
             simpl in ISO. destruct n. destruct n0. simpl.
             apply node_relu_output_link in H1. apply node_linear_input_link in H2.
             rewrite H1 in ISO. simpl in ISO. destruct l8. all: try inversion ISO.
-            inversion H2. rewrite H2 in ISO. rewrite ISO. reflexivity.
-            rewrite H2 in ISO. rewrite ISO. reflexivity.
+            all: match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+            all: rewrite H2 in ISO. all: simpl in ISO. all: exact ISO.
         +++ (*interesting: v1 and v2 are node, n1 and n2 are ReLu*)
             simpl in ISO. destruct n. destruct n0. simpl.
             apply node_relu_output_link in H1. apply node_relu_input_link in H2.
@@ -745,24 +891,24 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
       ++ simpl in ISO. inversion ISO.
       ++ simpl in ISO. inversion ISO.
       ++ destruct n2.
-        +++ simpl in H2. destruct v. destruct o.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
+            ** simpl in H2. destruct type_v. all: inversion H2.
         +++ (*interesting: v1 is node, v2 is output, n1 is ReLu, n2 is output*)
-            simpl in H2. destruct v. destruct o.
+            simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
             simpl in ISO. destruct n. apply node_relu_output_link in H1. simpl.
             rewrite H1 in ISO. simpl in ISO. destruct ISO. apply H0. inversion H0.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
+            ** simpl in H2. destruct type_v. all: inversion H2.
   - destruct n1.
     + destruct v2.
       ++ destruct n2.
@@ -776,35 +922,38 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
             * inversion H; inversion H0; inversion H2.
             * inversion H; inversion H0; inversion H2; inversion H3; inversion H4; inversion H5; inversion H6.
         +++ (*interesting: v1 is tensor, v2 is node, n1 is matrix, n2 is linear*)
-            simpl in H1; simpl in H2. simpl in ISO. destruct t. destruct n1. destruct o1. all: try inversion ISO.
-            apply tensor_matrix_link in H1. apply node_linear_input_link in H2. simpl. rewrite H2 in ISO.
-            simpl in ISO. destruct ISO.
+            simpl in H1; simpl in H2. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct n1. destruct tv_name. all: try inversion ISO.
+            apply tensor_matrix_link in H1. apply node_linear_input_link in H2. simpl.
+            match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+            rewrite H2 in ISO. simpl in ISO. destruct ISO.
             ** rewrite H1 in H. left. rewrite H. reflexivity.
             ** rewrite H1 in H. right. rewrite H. reflexivity.
-        +++ simpl in H1; simpl in H2. simpl in ISO. destruct t. destruct n1. destruct o1. all: try inversion ISO.
+            ** rewrite H2 in ISO. simpl in ISO. destruct ISO.
+               *** left. rewrite H1. reflexivity.
+        +++ simpl in H1; simpl in H2. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct n1. destruct tv_name. all: try inversion ISO.
             apply tensor_matrix_link in H1. apply node_relu_input_link in H2. simpl. rewrite H2 in ISO.
             simpl in ISO. inversion ISO.
       ++ simpl in ISO. inversion ISO.
       ++ destruct n2. all: simpl in H2. all: inversion H2.
       ++ destruct n2. all: simpl in H2.
-        +++ destruct v. destruct o.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
-        +++ destruct v. destruct o.
+            * simpl in H2. destruct type_v. all: inversion H2.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
+            * simpl in H2. destruct type_v. all: inversion H2.
         +++ (*interesting: v1 is tensor, v2 is output, n1 is matrix, n2 is output*)
-            simpl in H1. simpl in ISO. destruct t. destruct v. destruct o1. destruct o5.
+            simpl in H1. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct v as [vv_name vv_type vv_doc vv_meta]. destruct tv_name. destruct vv_name.
             apply tensor_matrix_link in H1. apply output_link in H2.
             * simpl. rewrite <- H1. rewrite H2. rewrite ISO. reflexivity.
             * inversion ISO.
             * inversion ISO.
-        +++ destruct v. destruct o.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
-        +++ destruct v. destruct o.
+            * simpl in H2. destruct type_v. all: inversion H2.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
+            * simpl in H2. destruct type_v. all: inversion H2.
     + destruct v2.
       ++ destruct n2.
         +++ simpl in H2. apply convert_node_returns_relu_or_gemm in H2. destruct H2.
@@ -817,42 +966,45 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
             * inversion H; inversion H0; inversion H2.
             * inversion H; inversion H0; inversion H2; inversion H3; inversion H4; inversion H5; inversion H6.
         +++ (*interesting: v1 is tensor, v2 is node, n1 is vector, n2 is linear*)
-            simpl in H1; simpl in H2. simpl in ISO. destruct t. destruct n0. destruct o1. all: try inversion ISO.
-            apply tensor_vector_link in H1. apply node_linear_input_link in H2. simpl. rewrite H2 in ISO.
-            simpl in ISO. destruct ISO.
+            simpl in H1; simpl in H2. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct n0. destruct tv_name. all: try inversion ISO.
+            apply tensor_vector_link in H1. apply node_linear_input_link in H2. simpl.
+            match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+            rewrite H2 in ISO. simpl in ISO. destruct ISO.
             ** rewrite H1 in H. left. rewrite H. reflexivity.
             ** rewrite H1 in H. right. rewrite H. reflexivity.
-        +++ simpl in H1; simpl in H2. simpl in ISO. destruct t. destruct n0. destruct o1. all: try inversion ISO.
+            ** rewrite H2 in ISO. simpl in ISO. destruct ISO.
+               *** left. rewrite H1. reflexivity.
+        +++ simpl in H1; simpl in H2. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct n0. destruct tv_name. all: try inversion ISO.
             apply tensor_vector_link in H1. apply node_relu_input_link in H2. simpl. rewrite H2 in ISO.
             simpl in ISO. inversion ISO.
       ++ simpl in ISO. inversion ISO.
       ++ destruct n2. all: simpl in H2. all: inversion H2.
       ++ destruct n2. all: simpl in H2.
-        +++ destruct v. destruct o.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
-        +++ destruct v. destruct o.
+            * simpl in H2. destruct type_v. all: inversion H2.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
+            * simpl in H2. destruct type_v. all: inversion H2.
         +++ (*interesting: v1 is tensor, v2 is output, n1 is vector, n2 is output*)
-            simpl in H1. simpl in ISO. destruct t. destruct v. destruct o1. destruct o5.
+            simpl in H1. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct v as [vv_name vv_type vv_doc vv_meta]. destruct tv_name. destruct vv_name.
             apply tensor_vector_link in H1. apply output_link in H2.
             * simpl. rewrite <- H1. rewrite H2. rewrite ISO. reflexivity.
             * inversion ISO.
             * inversion ISO.
-        +++ destruct v. destruct o.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
-        +++ destruct v. destruct o.
+            * simpl in H2. destruct type_v. all: inversion H2.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
-    + simpl in H1. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
+            * simpl in H2. destruct type_v. all: inversion H2.
+    + simpl in H1. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
       destruct H. destruct H. destruct H. inversion H.
       destruct H. destruct H. inversion H. simpl in H1. inversion H1.
-    + simpl in H1. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
+    + simpl in H1. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
       destruct H. destruct H. destruct H. inversion H.
       destruct H. destruct H. inversion H. simpl in H1. inversion H1.
-    + simpl in H1. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
+    + simpl in H1. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
       destruct H. destruct H. destruct H. inversion H.
       destruct H. destruct H. inversion H. simpl in H1. inversion H1.
   - simpl in H1. inversion H1.
@@ -891,21 +1043,23 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
         +++ (*interesting: v1 and v2 are node, n1 and n2 are Linear*)
             simpl in ISO. destruct n. destruct n0. simpl.
             apply node_linear_output_link in H1. apply node_linear_input_link in H2.
+            match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+            rewrite H1. rewrite H2. simpl. rewrite ISO. reflexivity.
             rewrite H1. rewrite H2. simpl. rewrite ISO. reflexivity.
         +++ (*interesting: v1 and v2 are node, n1 is Linear, n2 is ReLu*)
             simpl in ISO. destruct n. destruct n0. simpl.
             apply node_linear_output_link in H1. apply node_relu_input_link in H2.
             rewrite H1. rewrite H2. simpl. rewrite ISO. reflexivity.
       ++ simpl in ISO. destruct n2. all: inversion ISO.
-        +++ simpl in H2. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl in H2. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0.  destruct H0. inversion H0.
             destruct H0.  destruct H0. inversion H0.
             simpl in H2. inversion H2.
-        +++ simpl in H2. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl in H2. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0.  destruct H0. inversion H0.
             destruct H0.  destruct H0. inversion H0.
             simpl in H2. inversion H2.
-        +++ simpl in H2. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl in H2. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0.  destruct H0. inversion H0.
             destruct H0.  destruct H0. inversion H0.
             simpl in H2. inversion H2.
@@ -914,24 +1068,24 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
         +++ simpl in H2. inversion H2.
         +++ simpl in H2. inversion H2.
       ++ destruct n2.
-        +++ simpl in H2. destruct v. destruct o.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
+            ** simpl in H2. destruct type_v. all: inversion H2.
         +++ (*interesting: v1 is node, v2 is output, n1 is Linear, n2 is output*)
-            simpl in H2. destruct v. destruct o.
+            simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
             simpl in ISO. destruct n. apply node_linear_output_link in H1. simpl.
             rewrite <- H2. rewrite <- ISO. rewrite H1. simpl. left. reflexivity.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
+            ** simpl in H2. destruct type_v. all: inversion H2.
     + destruct v2.
       ++ destruct n2.
         +++ simpl in H2. apply convert_node_returns_relu_or_gemm in H2. destruct H2.
@@ -946,21 +1100,23 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
         +++ (*interesting: v1 and v2 are node, n1 is ReLu, n2 is Linear*)
             simpl in ISO. destruct n. destruct n0. simpl.
             apply node_relu_output_link in H1. apply node_linear_input_link in H2.
+            match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+            rewrite H1. rewrite H2.  simpl. rewrite ISO. reflexivity.
             rewrite H1. rewrite H2.  simpl. rewrite ISO. reflexivity.
         +++ (*interesting: v1 and v2 are node, n1 and n2 are ReLu*)
             simpl in ISO. destruct n. destruct n0. simpl.
             apply node_relu_output_link in H1. apply node_relu_input_link in H2.
             rewrite H1. rewrite H2.  simpl. rewrite ISO. reflexivity.
       ++ simpl in ISO. destruct n2. all: inversion ISO.
-        +++ simpl in H2. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl in H2. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0.  destruct H0. inversion H0.
             destruct H0.  destruct H0. inversion H0.
             simpl in H2. inversion H2.
-        +++ simpl in H2. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl in H2. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0.  destruct H0. inversion H0.
             destruct H0.  destruct H0. inversion H0.
             simpl in H2. inversion H2.
-        +++ simpl in H2. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl in H2. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0.  destruct H0. inversion H0.
             destruct H0.  destruct H0. inversion H0.
             simpl in H2. inversion H2.
@@ -969,24 +1125,24 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
         +++ simpl in H2. inversion H2.
         +++ simpl in H2. inversion H2.
       ++ destruct n2.
-        +++ simpl in H2. destruct v. destruct o.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
+            ** simpl in H2. destruct type_v. all: inversion H2.
         +++ (*interesting: v1 is node, v2 is output, n1 is ReLu, n2 is output*)
-            simpl in H2. destruct v. destruct o.
+            simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
             simpl in ISO. destruct n. apply node_relu_output_link in H1. simpl.
             rewrite <- H2. rewrite <- ISO. rewrite H1. simpl. left. reflexivity.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
-        +++ simpl in H2. destruct v. destruct o.
+            ** simpl in H2. destruct type_v. all: inversion H2.
+        +++ simpl in H2. destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             ** apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            ** simpl in H2. destruct o0. all: inversion H2.
+            ** simpl in H2. destruct type_v. all: inversion H2.
   - destruct n1.
     + destruct v2.
       ++ destruct n2.
@@ -1000,26 +1156,32 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
             * inversion H; inversion H0; inversion H2.
             * inversion H; inversion H0; inversion H2; inversion H3; inversion H4; inversion H5; inversion H6.
         +++ (*interesting: v1 is tensor, v2 is node, n1 is matrix, n2 is linear*)
-            simpl in H1; simpl in H2. simpl in ISO. destruct t. destruct n1. destruct o1. all: try inversion ISO.
+            simpl in H1; simpl in H2. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct n1. destruct tv_name. all: try inversion ISO.
             apply tensor_matrix_link in H1. apply node_linear_input_link in H2. simpl.
-            * destruct ISO.
+            * match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+              all: destruct ISO.
               ** rewrite H1. rewrite H. rewrite H2. simpl. left. reflexivity.
               ** rewrite H1. rewrite H. rewrite H2. simpl. left. reflexivity.
+              ** rewrite H2. simpl. rewrite H1. rewrite H. reflexivity.
+              ** rewrite H2. simpl. rewrite H1. rewrite H. reflexivity.
             * apply tensor_matrix_link in H1. apply node_linear_input_link in H2. simpl.
-              ** rewrite H2. rewrite H1. destruct ISO. all: rewrite H0. all: simpl.
-                 *** left. reflexivity.
-                 *** right. reflexivity.
+              ** match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+                 all: rewrite H2. all: simpl. all: destruct ISO.
+                 all: try (left; rewrite H1; rewrite H; reflexivity).
+                 all: try (right; rewrite H1; injection H as H'; rewrite H'; reflexivity).
+                 all: try (rewrite H1; rewrite H; reflexivity).
+                 all: try (inversion H).
             * simpl in H1. inversion H1.
             * simpl in H1. inversion H1.
-        +++ simpl in H1; simpl in H2. simpl in ISO. destruct t. destruct n1. destruct o2. all: try inversion ISO.
+        +++ simpl in H1; simpl in H2. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct n1. destruct tv_name. all: try inversion ISO.
       ++ simpl in ISO. destruct n2. all: inversion ISO.
-        +++ simpl. simpl in H2. destruct t0. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl. simpl in H2. destruct t0 as [t0_dims t0_dt t0_seg t0_f32 t0_i32 t0_str t0_i64 t0_name t0_doc t0_raw t0_ext t0_loc t0_f64 t0_u64 t0_meta]. destruct t0_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0. destruct H0. inversion H0.
             destruct H0. destruct H0. inversion H0. simpl in H2. inversion H2.
-        +++ simpl. simpl in H2. destruct t0. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl. simpl in H2. destruct t0 as [t0_dims t0_dt t0_seg t0_f32 t0_i32 t0_str t0_i64 t0_name t0_doc t0_raw t0_ext t0_loc t0_f64 t0_u64 t0_meta]. destruct t0_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0. destruct H0. inversion H0.
             destruct H0. destruct H0. inversion H0. simpl in H2. inversion H2.
-        +++ simpl. simpl in H2. destruct t0. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
+        +++ simpl. simpl in H2. destruct t0 as [t0_dims t0_dt t0_seg t0_f32 t0_i32 t0_str t0_i64 t0_name t0_doc t0_raw t0_ext t0_loc t0_f64 t0_u64 t0_meta]. destruct t0_name. apply convert_tensor_returns_matrix_or_vector in H2. destruct H2.
             destruct H0. destruct H0. destruct H0. inversion H0.
             destruct H0. destruct H0. inversion H0. simpl in H2. inversion H2.
       ++ simpl in H2. inversion H2.
@@ -1027,14 +1189,14 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
          +++ simpl in ISO. inversion ISO.
          +++ simpl in ISO. inversion ISO.
          +++ (*interesting: v1 is tensor, v2 is output, n1 is matrix, n2 is output*)
-            simpl in H1. simpl in ISO. destruct t. destruct v. destruct o1. destruct o5.
+            simpl in H1. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct v as [vv_name vv_type vv_doc vv_meta]. destruct tv_name. destruct vv_name.
             apply tensor_matrix_link in H1. apply output_link in H2.
             * simpl. rewrite H1. rewrite <- H2. rewrite ISO. reflexivity.
-            * simpl in H2. destruct o6. all: inversion H2.
+            * simpl in H2. destruct vv_type. all: inversion H2.
             * simpl in H1. inversion H1.
-         +++ destruct v. destruct o.
+         +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
+            * simpl in H2. destruct type_v. all: inversion H2.
          +++ simpl in ISO. inversion ISO.
     + destruct v2.
       ++ destruct n2.
@@ -1048,72 +1210,78 @@ Proof. intros v1 v2 n1 n2 H1 H2 ISO. destruct v1.
             * inversion H; inversion H0; inversion H2.
             * inversion H; inversion H0; inversion H2; inversion H3; inversion H4; inversion H5; inversion H6.
         +++ (*interesting: v1 is tensor, v2 is node, n1 is vector, n2 is linear*)
-            simpl in H1; simpl in H2. simpl in ISO. destruct t. destruct n0. destruct o1. all: try inversion ISO.
+            simpl in H1; simpl in H2. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct n0. destruct tv_name. all: try inversion ISO.
             apply tensor_vector_link in H1. apply node_linear_input_link in H2. simpl.
-            ** rewrite H1. rewrite H. rewrite H2. simpl. destruct ISO. left. reflexivity.
-               right. rewrite <- H0. rewrite <- H. reflexivity.
-            ** simpl. apply tensor_vector_link in H1. apply node_linear_input_link in H2. simpl. 
-               rewrite H2. rewrite H1. rewrite H. simpl. right. reflexivity.
+            ** match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+               rewrite H1. rewrite H. rewrite H2. simpl. destruct ISO. left. reflexivity.
+               right. injection H0 as Hx. rewrite Hx. rewrite H. reflexivity.
+               rewrite H2. simpl. rewrite H1. rewrite H. reflexivity.
+            ** simpl. apply tensor_vector_link in H1. apply node_linear_input_link in H2. simpl.
+               match goal with [ H2 : context [match ?x with Some _ => _ | None => _ end] |- _ ] => destruct x end.
+               all: rewrite H2. all: simpl. all: rewrite H1.
+               all: first [ right; injection H as Hx; rewrite Hx; reflexivity
+                          | left; rewrite H; reflexivity
+                          | inversion H ].
             ** simpl in H1. inversion H1.
             ** simpl in H1. inversion H1.
-        +++ simpl in H1; simpl in H2. simpl in ISO. destruct t. destruct n0. destruct o1. all: try inversion ISO.
+        +++ simpl in H1; simpl in H2. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct n0. destruct tv_name. all: try inversion ISO.
       ++ simpl in ISO. destruct n2. all: inversion ISO. all: simpl in H2.
-        +++ destruct t0. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2.
+        +++ destruct t0 as [t0_dims t0_dt t0_seg t0_f32 t0_i32 t0_str t0_i64 t0_name t0_doc t0_raw t0_ext t0_loc t0_f64 t0_u64 t0_meta]. destruct t0_name. apply convert_tensor_returns_matrix_or_vector in H2.
             destruct H2. destruct H0. destruct H0. destruct H0. inversion H0.
             destruct H0. destruct H0. inversion H0.
             simpl in H2. inversion H2.
-        +++ destruct t0. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2.
+        +++ destruct t0 as [t0_dims t0_dt t0_seg t0_f32 t0_i32 t0_str t0_i64 t0_name t0_doc t0_raw t0_ext t0_loc t0_f64 t0_u64 t0_meta]. destruct t0_name. apply convert_tensor_returns_matrix_or_vector in H2.
             destruct H2. destruct H0. destruct H0. destruct H0. inversion H0.
             destruct H0. destruct H0. inversion H0.
             simpl in H2. inversion H2.
-        +++ destruct t0. destruct o1. apply convert_tensor_returns_matrix_or_vector in H2.
+        +++ destruct t0 as [t0_dims t0_dt t0_seg t0_f32 t0_i32 t0_str t0_i64 t0_name t0_doc t0_raw t0_ext t0_loc t0_f64 t0_u64 t0_meta]. destruct t0_name. apply convert_tensor_returns_matrix_or_vector in H2.
             destruct H2. destruct H0. destruct H0. destruct H0. inversion H0.
             destruct H0. destruct H0. inversion H0.
             simpl in H2. inversion H2.
       ++ destruct n2. all: simpl in H2. all: inversion H2.
       ++ destruct n2. all: simpl in H2.
-        +++ destruct v. destruct o.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
-        +++ destruct v. destruct o.
+            * simpl in H2. destruct type_v. all: inversion H2.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
+            * simpl in H2. destruct type_v. all: inversion H2.
         +++ (*interesting: v1 is tensor, v2 is output, n1 is vector, n2 is output*)
-            simpl in H1. simpl in ISO. destruct t. destruct v. destruct o1. destruct o5.
+            simpl in H1. simpl in ISO. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct v as [vv_name vv_type vv_doc vv_meta]. destruct tv_name. destruct vv_name.
             apply tensor_vector_link in H1. apply output_link in H2.
             * simpl. rewrite H1. rewrite <- H2. rewrite ISO. reflexivity.
-            * simpl in H2. destruct o6. all: inversion H2.
+            * simpl in H2. destruct vv_type. all: inversion H2.
             * simpl in H1. inversion H1.
-        +++ destruct v. destruct o.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
-        +++ destruct v. destruct o.
+            * simpl in H2. destruct type_v. all: inversion H2.
+        +++ destruct v as [name_v type_v doc_v meta_v]. destruct name_v.
             * apply convert_valueInfo_returns_output in H2. destruct H2. inversion H.
-            * simpl in H2. destruct o0. all: inversion H2.
-    + simpl in H1. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
+            * simpl in H2. destruct type_v. all: inversion H2.
+    + simpl in H1. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
       destruct H. destruct H. destruct H. inversion H.
       destruct H. destruct H. inversion H. simpl in H1. inversion H1.
-    + simpl in H1. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
+    + simpl in H1. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
       destruct H. destruct H. destruct H. inversion H.
       destruct H. destruct H. inversion H. simpl in H1. inversion H1.
-    + simpl in H1. destruct t. destruct o1. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
+    + simpl in H1. destruct t as [tv_dims tv_dt tv_seg tv_f32 tv_i32 tv_str tv_i64 tv_name tv_doc tv_raw tv_ext tv_loc tv_f64 tv_u64 tv_meta]. destruct tv_name. apply convert_tensor_returns_matrix_or_vector in H1. destruct H1.
       destruct H. destruct H. destruct H. inversion H.
       destruct H. destruct H. inversion H. simpl in H1. inversion H1.
   - simpl in H1. inversion H1.
   - destruct n1. all: simpl in H1.
-    + destruct v. destruct o. apply convert_valueInfo_returns_output in H1.
+    + destruct v as [name_v type_v doc_v meta_v]. destruct name_v. apply convert_valueInfo_returns_output in H1.
       destruct H1. inversion H.
-      simpl in H1. destruct o0. all: inversion H1.
-    + destruct v. destruct o. apply convert_valueInfo_returns_output in H1.
+      simpl in H1. destruct type_v. all: inversion H1.
+    + destruct v as [name_v type_v doc_v meta_v]. destruct name_v. apply convert_valueInfo_returns_output in H1.
       destruct H1. inversion H.
-      simpl in H1. destruct o0. all: inversion H1.
+      simpl in H1. destruct type_v. all: inversion H1.
     + simpl in ISO. destruct n2. all: inversion ISO.
-    + destruct v. destruct o. apply convert_valueInfo_returns_output in H1.
+    + destruct v as [name_v type_v doc_v meta_v]. destruct name_v. apply convert_valueInfo_returns_output in H1.
       destruct H1. inversion H.
-      simpl in H1. destruct o0. all: inversion H1.
-    + destruct v. destruct o. apply convert_valueInfo_returns_output in H1.
+      simpl in H1. destruct type_v. all: inversion H1.
+    + destruct v as [name_v type_v doc_v meta_v]. destruct name_v. apply convert_valueInfo_returns_output in H1.
       destruct H1. inversion H.
-      simpl in H1. destruct o0. all: inversion H1.
+      simpl in H1. destruct type_v. all: inversion H1.
   Qed.
 
 

@@ -4,7 +4,7 @@ from torch import nn
 DEFAULT_WIDTH = 4
 LAYER_RANGE = range(1,16)
 
-example_input = (torch.randn(1,DEFAULT_WIDTH))
+example_input = torch.randn(1,DEFAULT_WIDTH)
 
 for l in LAYER_RANGE:
     layers = []

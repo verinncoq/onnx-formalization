@@ -1,4 +1,5 @@
-From mathcomp Require Import all_boot all_algebra all_order.
+Set Warnings "-notation-overridden,-ambiguous-paths".
+From mathcomp Require Import boot algebra order.
 From mathcomp Require Import interval_inference tensor.
 From ONNXFormalization.VNNLIB.ONNX Require Import Syntax.
 
@@ -27,8 +28,8 @@ end.
 Definition TensorOp1 (n : TensorType ElementType) :=
 TensorSemantics n -> TensorSemantics n.
 
-Definition TensorOp2 (n : TensorType ElementType) :=
-TensorSemantics n -> TensorSemantics n -> TensorSemantics n.
+Definition TensorOp2 (n : TensorType ElementType)
+:= TensorSemantics n -> TensorSemantics n -> TensorSemantics n.
 
 Definition TensorComp (n : TensorType ElementType) :=
 TensorSemantics n -> TensorSemantics n -> bool.
@@ -39,7 +40,6 @@ TensorsSemantics inputTypes -> TensorSemantics outputType.
 
 End Semantics.
 
-Section NetworkTheorySemantics.
 Record NetworkTheorySemantics (syn : NetworkTheorySyntax) := {
     elementType : ElementType syn -> eqType;
     theoryTensor : forall {t}, TheoryTensor syn t -> TensorSemantics elementType t;
@@ -55,4 +55,3 @@ Record NetworkTheorySemantics (syn : NetworkTheorySyntax) := {
     add : forall {d}, TensorOp2 elementType d;
     mul : forall {d}, TensorOp2 elementType d
 }.
-End NetworkTheorySemantics.

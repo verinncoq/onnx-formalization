@@ -18,6 +18,8 @@ depends: [
   "conf-protoc" {= "4.4.0"}
   "rocq-mathcomp-boot" {= "2.6.0"}
   "rocq-mathcomp-algebra" {= "2.6.0"}
+  "rocq-mathcomp-reals" {= "1.18.0"}
+  "rocq-mathcomp-reals-stdlib" {= "1.18.0"}
   "odoc" {with-doc}
 ]
 build: [
