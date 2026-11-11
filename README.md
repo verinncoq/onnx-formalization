@@ -1,4 +1,4 @@
-# ONNX Formal Core: a Rocq mechanisation of ONNX linked to VNN-LIB
+# ONNX meets VNN-LIB in Rocq: Bridging Execution, Verification and Formalisation of Neural Networks
 
 This repository contains **ONNX Formal Core (ONNX^FC)**, a mechanisation of the ONNX neural network format in Rocq. It makes an ONNX network a formal object that proofs can reason about, and links it to VNN-LIB, the community standard for neural network verification queries.
 
