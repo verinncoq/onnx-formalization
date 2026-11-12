@@ -122,7 +122,6 @@ Definition const_model : ModelProto :=
 Compute emap (map getValues) (onnx_evaluator identity_model [:: x]).
 
 Compute emap (map getValues) (onnx_evaluator identity_model [::]).
-gemm_float32
 
 (* Definition f32_div (a b : Z) : float32 := *)
 (*   @Binary.Bdiv 24 128 Hprec32 Hmax32 binop_nan_pl32 BinarySingleNaN.mode_NE (f32 a) (f32 b). *)
