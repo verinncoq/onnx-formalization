@@ -30,8 +30,8 @@ let decode_binary_to_text_proto (protobuf_schema : string) (input_file : string)
 (* Parse inputs from stdin.
    Format: One line per evaluation, each evaluation is a list of inputs.
    Each input: name|value1,value2,...|dim1,dim2,...
-   Inputs in one evaluation are separated by ';;'
-   Example: input1|0.1,0.2,0.3|1,28,28;;input2|0.4,0.5|1,10
+   Inputs in one evaluation are separated by ';'
+   Example: input1|0.1,0.2,0.3|1,28,28;input2|0.4,0.5|1,10
  *)
 let parse_inputs_from_stdin () : ((string * string list) * string list) list list =
   let lines = ref [] in

@@ -1,0 +1,5 @@
+numpy        # comparer.py: arrays / allclose
+onnxruntime  # comparer.py: reference implementation the Rocq evaluator is compared against
+torch        # generate_dataset.py: builds the test models (torch.onnx.export)
+onnx         # torch.onnx.export(dynamo=True); generate_dataset.py reads model_proto.opset_import
+onnxscript   # required by torch.onnx.export(dynamo=True); NOT installed by default since torch 2.9

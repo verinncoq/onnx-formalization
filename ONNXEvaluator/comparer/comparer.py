@@ -60,13 +60,20 @@ def array_to_string_list(a: np.ndarray):
 
 def format_input_for_runner(input_name: str, values: list, dims: list) -> str:
     """Format a single input as name|value1,value2,...|dim1,dim2,..."""
-    values_str = ",".join([f"{v:.6f}" for v in values])
+    # repr(float(v)) is the shortest string that parses back to the exact same
+    # float64; since v came from a float32, the runner's float_of_string +
+    # Int32.bits_of_float then recover the original float32 bit pattern.
+    # (The previous "%.6f" rounded inputs to 6 decimals, so the evaluator was
+    # tested on different values than ONNX Runtime.)
+    values_str = ",".join([repr(float(v)) for v in values])
     dims_str = ",".join([str(d) for d in dims])
     return f"{input_name}|{values_str}|{dims_str}"
 
 
 # Serialize all inputs for the runner
-# Format: One line per evaluation, inputs separated by ';;'
+# Format: One line per evaluation, inputs separated by ';'
+# (the runner splits each line on ';', so a multi-char separator like ';;'
+# would leave an empty segment and fail with "Invalid input format")
 # Each input: name|value1,value2,...|dim1,dim2,...
 runner_input_lines = []
 for inputs_per_evaluation in inputs:
@@ -74,7 +81,7 @@ for inputs_per_evaluation in inputs:
     for input_nr, input_array in enumerate(inputs_per_evaluation):
         values, dims = array_to_string_list(input_array)
         input_strs.append(format_input_for_runner(input_names[input_nr], values, dims))
-    runner_input_lines.append(";;".join(input_strs))
+    runner_input_lines.append(";".join(input_strs))
 
 runner_input = "\n".join(runner_input_lines)
 
@@ -107,9 +114,9 @@ if result_.returncode != 0:
     exit(1)
 
 
-def parse_runner_output(output_bytes: bytes):
-    """Parse the runner output into numpy arrays.
-    
+def parse_rocq_runner_output(output_bytes: bytes):
+    """Parse the Rocq runner output into numpy arrays.
+
     The runner outputs: [[(vals, dims), ...], [(vals, dims), ...], ...]
     Each evaluation output is a list of (values_list, dims_list) tuples.
     """
@@ -128,9 +135,17 @@ def parse_runner_output(output_bytes: bytes):
     for evaluation in parsed:
         if evaluation == "":
             continue
+        if isinstance(evaluation, str):
+            # The runner reports per-evaluation errors as plain strings, e.g. "Error: ..."
+            print(f"Rocq ONNX runner error: {evaluation}")
+            results.append([])
+            continue
         out_inner = []
         # evaluation is a list of (values_list, dims_list) tuples
         for output in evaluation:
+            if isinstance(output, str):
+                print(f"Rocq ONNX runner error: {output}")
+                continue
             if isinstance(output, tuple) and len(output) == 2:
                 values, dims = output
                 a = np.array([float(v) for v in values])
@@ -142,18 +157,26 @@ def parse_runner_output(output_bytes: bytes):
     return results
 
 
-# Parse runner output
+# Parse Rocq runner output
 runner_output = result_.stdout
-rocq_results = parse_runner_output(runner_output)
+rocq_results = parse_rocq_runner_output(runner_output)
 
 # compare
 correct = True
+if len(rocq_results) != len(runtime_outputs):
+    print(f"Runner returned {len(rocq_results)} evaluation results, expected {len(runtime_outputs)}")
+    correct = False
 for i, (runtime, rocq) in enumerate(zip(runtime_outputs, rocq_results)):
     print("-------------------------------------------------------------------------")
     print("ROCQ:         ", rocq)
     print("ONNX Runtime: ", runtime)
     print("-------------------------------------------------------------------------")
-    if not np.allclose(runtime, rocq):
+    # Compare per output tensor with explicit shape check: np.allclose alone
+    # raises ValueError on non-broadcastable shapes (e.g. runner error -> [])
+    same = len(runtime) == len(rocq) and all(
+        r.shape == c.shape and np.allclose(r, c) for r, c in zip(runtime, rocq)
+    )
+    if not same:
         print(f"Mismatch at evaluation {i}")
         correct = False
 
@@ -165,3 +188,4 @@ else:
     print(
         "Unfortunately, the ONNX Runtime and Rocq's ONNX Evaluator do not return the same results on every tested input.")
     print(f"The Formalization is not said the be correct! You should debug this file ({sys.argv[0]}), especially the parameters defined at the beginning.")
+    exit(1)
