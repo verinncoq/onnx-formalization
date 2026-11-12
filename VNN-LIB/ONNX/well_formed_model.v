@@ -2909,7 +2909,7 @@ Definition model_well_formed (m : ModelProto) : bool :=
       all (fun n => (dt == Some FLOAT_TensorProto) || gemm_int_attrs_ok (get_attributes n)) nodes]
   else false.
 
-Lemma well_formed_computes (m : ModelProto) (xs : seq TensorProto)
+Lemma evaluation_cannot_fail (m : ModelProto) (xs : seq TensorProto)
   : all tensorProtoSized xs ->
     all (fun o => all (fun u => tensor_dtype u == value_tensor_type o) xs) (graph_outputs m) ->
     (** every user tensor given for a graph input has the input's declared dims **)

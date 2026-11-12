@@ -66,8 +66,6 @@ have -> : \prod_(i < k) (u i)%:num = dims_prod tdims.
 by case: x => // /eqP.
 Qed.
 
-(* TODO: data_type is a reference to the enum DataType_TensorProto, so there
-should be a check these match *)
 
 (** A TensorProto with the declared dims and element type x, read as a
 mathcomp tensor: the data field for x holds exactly the entries of the
@@ -113,7 +111,7 @@ Executes the network by exploring the ModelProto exactly as
 ONNXEvaluator.onnx_evaluator does: build the same list of vertices,
 evaluate the output vertex, and recurse through node inputs found with
 find_vertex. Every failure branch of onnx_evaluator is ruled out by
-model_well_formed (the fuel by acyclic_at, as in well_formed_computes).
+model_well_formed (the fuel by acyclic_at, as in evaluation_cannot_fail).
 - Node:   Gemm (2 or 3 inputs) and Relu inputs are evaluated recursively,
           then gemm_2_inputs, gemm_3_inputs or op_relu is applied.
 - Tensor: the initialiser is turned into a mathcomp tensor with
@@ -1354,9 +1352,6 @@ Definition modelTensorProto (y : NetworkType (ElementType syntax_inst))
     (node_output_indexP out).2 in
   ecast X X (esym out_iE) out_i.
 
-(* TODO: Make this so that it extracts model to a maths function over mathcomp tensors and applies it to inputSemantics. Must cascade input through entire graph.
- Map model to a function over mathcomp tensor **)
-
 (* Definition modelTensorProto (y : NetworkType (ElementType syntax_inst)) *)
 (* (n : Model syntax_inst y) (inp : InputSemantics denote y) *)
 (* (d : TensorType (ElementType syntax_inst)) (u : NodeOutputName syntax_inst) *)
@@ -1695,7 +1690,6 @@ exact: (@Tensor _ _ dims _ int32 (map2_mx (fun h1 h2 => int32_of_Z
 exact: (@Tensor _ _ dims _ int64 (map2_mx (fun h1 h2 => int64_of_Z ((Z_of_int64 h1) + (Z_of_int64 h2))) (\val t) (\val u))).
 Defined.
 
-(** TODO: The zero_tensor needs to be reshaped **)
 Definition tmul (d : TensorType (ElementType syntax_inst)) : TensorOp2 denote d.
 Proof.
 case: d => [[[]]] //= type_in [k dims] t u.
@@ -1705,9 +1699,6 @@ exact: (@Tensor _ _ dims _ int32 (map2_mx (fun h1 h2 => int32_of_Z
 exact: (@Tensor _ _ dims _ int64 (map2_mx (fun h1 h2 => int64_of_Z ((Z_of_int64 h1) * (Z_of_int64 h2))) (\val t) (\val u))).
 Defined.
 
-(** TODO: Change to denotational (mathcomp) semantics **)
-(** This now does denotational for the strcture, but still uses the ints and floats
-for the individual operations **)
 Definition semantics_inst : NetworkTheorySemantics syntax_inst :=
   {|
       elementType := denote;

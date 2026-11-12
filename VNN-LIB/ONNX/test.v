@@ -32,11 +32,97 @@ Open Scope quotient_scope.
 
 (* Compute test. *)
 
-(* Lemma Hprec32 : FLX.Prec_gt_0 24. Proof. reflexivity. Qed. *)
-(* Lemma Hmax32  : BinarySingleNaN.Prec_lt_emax 24 128. Proof. reflexivity. Qed. *)
+Lemma Hprec32 : FLX.Prec_gt_0 24. Proof. reflexivity. Qed.
+Lemma Hmax32  : BinarySingleNaN.Prec_lt_emax 24 128. Proof. reflexivity. Qed.
 
-(* Definition f32 (n : Z) : binary32 := *)
-(*   Binary.binary_normalize 24 128 Hprec32 Hmax32 BinarySingleNaN.mode_NE n 0 false. *)
+Definition f32 (n : Z) : binary32 :=
+  Binary.binary_normalize 24 128 Hprec32 Hmax32 BinarySingleNaN.mode_NE n 0 false.
+
+(** x : float[1] --> x : float[1].  No nodes: the graph output names the
+    graph input directly. *)
+Definition identity_graph : GraphProto :=
+  let vinfo :=
+    ValueInfoProto_constructor (Some """x"""%string)
+      (Some (TypeProto_constructor
+               (Some (tensor_type_value_TypeProto
+                        (Tensor_TypeProto_constructor (Some (int32_of_Z 1)) (* FLOAT *)
+                           (Some (TensorShapeProto_constructor
+                                    [:: Dimension_TensorShapeProto_constructor
+                                          (Some (dim_value_value_Dimension_TensorShapeProto (int64_of_Z 1))) None])))))
+               None))
+      None nil in
+  GraphProto_constructor
+    nil            (* node *)
+    None           (* name *)
+    nil            (* initializer *)
+    nil            (* sparse_initializer *)
+    None           (* doc_string *)
+    [:: vinfo]     (* input *)
+    [:: vinfo]     (* output *)
+    nil            (* value_info *)
+    nil nil.
+
+(** x : float[1] = [5] *)
+Definition x : TensorProto :=
+  TensorProto_constructor
+    [:: int64_of_Z 1]            (* dims *)
+    (Some (int32_of_Z 1))        (* data_type: FLOAT *)
+    None                         (* segment *)
+    [:: f32 5]                   (* float_data *)
+    nil nil nil                  (* int32_data, string_data, int64_data *)
+    (Some """x"""%string)        (* name *)
+    None None                    (* doc_string, raw_data *)
+    nil None                     (* external_data, data_location *)
+    nil nil nil.                 (* double_data, uint64_data, metadata_props *)
+
+Definition identity_model : ModelProto :=
+  ModelProto_constructor None
+    [:: (OperatorSetIdProto_constructor None (Some (int64_of_Z 23)))]
+    None None None None None (Some identity_graph) [::] [::] [::] [::].
+
+Definition emap {T T'} (f : T -> T') (x : error_option T) : error_option T' := match x with
+                                                                              | Success x => Success (f x)
+                                                                              | Error x => Error x
+                                                                              end.
+
+Definition getValues (x : TensorProto) : seq string :=
+  match x with
+  | TensorProto_constructor _ _ _ floats _ _ _ _ _ _ _ _ _ _ _ => map string_of_float32 floats
+  end.
+
+(** () --> x : float[1] = [5].  No inputs or nodes: the graph output names
+    the initializer [x] directly. *)
+Definition const_graph : GraphProto :=
+  let vinfo :=
+    ValueInfoProto_constructor (Some """x"""%string)
+      (Some (TypeProto_constructor
+               (Some (tensor_type_value_TypeProto
+                        (Tensor_TypeProto_constructor (Some (int32_of_Z 1)) (* FLOAT *)
+                           (Some (TensorShapeProto_constructor
+                                    [:: Dimension_TensorShapeProto_constructor
+                                          (Some (dim_value_value_Dimension_TensorShapeProto (int64_of_Z 1))) None])))))
+               None))
+      None nil in
+  GraphProto_constructor
+    nil            (* node *)
+    None           (* name *)
+    [:: x]         (* initializer *)
+    nil            (* sparse_initializer *)
+    None           (* doc_string *)
+    nil            (* input *)
+    [:: vinfo]     (* output *)
+    nil            (* value_info *)
+    nil nil.
+
+Definition const_model : ModelProto :=
+  ModelProto_constructor None
+    [:: (OperatorSetIdProto_constructor None (Some (int64_of_Z 23)))]
+    None None None None None (Some const_graph) [::] [::] [::] [::].
+
+Compute emap (map getValues) (onnx_evaluator identity_model [:: x]).
+
+Compute emap (map getValues) (onnx_evaluator identity_model [::]).
+gemm_float32
 
 (* Definition f32_div (a b : Z) : float32 := *)
 (*   @Binary.Bdiv 24 128 Hprec32 Hmax32 binop_nan_pl32 BinarySingleNaN.mode_NE (f32 a) (f32 b). *)
@@ -100,16 +186,6 @@ Open Scope quotient_scope.
 (*     [:: vinfo """x"""%string] *)
 (*     nil *)
 (*     nil nil. *)
-
-(* Definition emap {T T'} (f : T -> T') (x : error_option T) : error_option T' := match x with *)
-(* | Success x => Success (f x) *)
-(* | Error x => Error x *)
-(* end. *)
-
-(* Definition getValues (x : TensorProto) : seq string := *)
-(* match x with *)
-(* | TensorProto_constructor _ _ _ floats _ _ _ _ _ _ _ _ _ _ _ => map string_of_float32 floats *)
-(* end. *)
 
 (* (* Compute emap (map get_dims) (onnx_evaluator model [:: aaaa]). *) *)
 
