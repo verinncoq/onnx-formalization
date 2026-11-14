@@ -1,7 +1,7 @@
 (rocq.extraction
  (prelude onnx_evaluator_extraction)
  (extracted_modules rocq_onnx_evaluator)
- (theories Stdlib Flocq
+ (theories Stdlib Flocq mathcomp HB elpi elpi_elpi
    ONNXFormalization.External
    ONNXFormalization.ProtobufDatatypes
    ONNXFormalization.ProtobufConverter
