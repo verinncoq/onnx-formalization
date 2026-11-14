@@ -1279,7 +1279,7 @@ case/tensorProtoSizedP: (Ht') => dims2 dtype2 seg2 float322 int322 bytes2 int642
 move: (Hdtype1);
 rewrite -Hdtype2 Hist Hist' /= datatype1 datatype2 // => _;
 move: Hdims Hint;
-rewrite /gemm_dims_ok /gemm_int_attrs_ok /gemm_two_inputs;
+rewrite /gemm_dims_ok /gemm_int_attrs_ok -gemm_2_equiv_isSuccess /gemm_two_inputs';
 case: (get_gemm_attributes a) => [[[alpha beta] transA] transB] /and3P [Hdc1 Hdc2 /eqP Hk] Hint;
 have /andP [h1 w1] := mat_dims_pos _ Hdc1;
 have /andP [h2 w2] := mat_dims_pos _ Hdc2;
@@ -1364,7 +1364,7 @@ case/tensorProtoSizedP: (Ht2) => dims2 dtype2 seg2 float322 int322 bytes2 int642
 have := eq_trans Hdtype0 (esym Hdtype1);
 have := eq_trans Hdtype0 (esym Hdtype2) => //=;
 rewrite Hist0 Hist1 Hist2 /= datatype0 datatype1 datatype2 // => _ _;
-rewrite /gemm;
+rewrite -gemm_equiv_isSuccess /gemm';
 rewrite -!Hist0 -!Hist1 -!Hist2;
 move: Hdims Hint;
 rewrite /gemm3_dims_ok /gemm_dims_ok /gemm_int_attrs_ok;
@@ -1908,7 +1908,7 @@ Lemma gemm_sized A B C a t :
   gemm A B C a = Success t -> tensorProtoSized t.
 Proof.
 move=> SA SB SC.
-rewrite /gemm; case: (get_gemm_attributes a) => [[[al be] ta] tb].
+move=> /(proj2 (gemm_equiv_success _ _ _ _ _)); rewrite /gemm'; case: (get_gemm_attributes a) => [[[al be] ta] tb].
 case/tensorProtoSizedP: (SA) => dimsA dA ? ? ? ? ? ? ? ? ? ? ? ? ? EA DA _ _.
 all: case/tensorProtoSizedP: (SB) => dimsB dB ? ? ? ? ? ? ? ? ? ? ? ? ? EB DB _ _.
 all: case/tensorProtoSizedP: (SC) => dimsC dC ? ? ? ? ? ? ? ? ? ? ? ? ? EC DC _ _.
@@ -1952,7 +1952,7 @@ Lemma gemm_two_sized A B a t :
   gemm_two_inputs A B a = Success t -> tensorProtoSized t.
 Proof.
 move=> SA SB.
-rewrite /gemm_two_inputs; case: (get_gemm_attributes a) => [[[al be] ta] tb].
+move=> /(proj2 (gemm_2_equiv_success _ _ _ _)); rewrite /gemm_two_inputs'; case: (get_gemm_attributes a) => [[[al be] ta] tb].
 case/tensorProtoSizedP: (SA) => dimsA dA ? ? ? ? ? ? ? ? ? ? ? ? ? EA DA _ _;
 case/tensorProtoSizedP: (SB) => dimsB dB ? ? ? ? ? ? ? ? ? ? ? ? ? EB DB _ _;
 rewrite {1}EA {1}EB; cbv beta iota zeta; first [rewrite (DataType_float DA) | rewrite (DataType_int32 DA) | rewrite (DataType_int64 DA)]; first [rewrite (DataType_float DB) | rewrite (DataType_int32 DB) | rewrite (DataType_int64 DB)]; cbv iota; try by [].
@@ -2039,7 +2039,7 @@ Qed.
 Lemma gemm_two_dtype A B a t :
   gemm_two_inputs A B a = Success t -> tensor_dtype t = tensor_dtype A.
 Proof.
-rewrite /gemm_two_inputs; case: (get_gemm_attributes a) => [[[al be] tA] tB].
+move=> /(proj2 (gemm_2_equiv_success _ _ _ _)); rewrite /gemm_two_inputs'; case: (get_gemm_attributes a) => [[[al be] tA] tB].
 case: A => dA [ta|] ? ? ? ? ? ? ? ? ? ? ? ? ?;
 case: B => dB [tb|] ? ? ? ? ? ? ? ? ? ? ? ? ? //=.
 rewrite /DataType_TensorProto_of_int32.
@@ -2054,7 +2054,7 @@ Qed.
 Lemma gemm_dtype A B C a t :
   gemm A B C a = Success t -> tensor_dtype t = tensor_dtype A.
 Proof.
-rewrite /gemm; case: (get_gemm_attributes a) => [[[al be] tA] tB].
+move=> /(proj2 (gemm_equiv_success _ _ _ _ _)); rewrite /gemm'; case: (get_gemm_attributes a) => [[[al be] tA] tB].
 case: A => dA [ta|] ? ? ? ? ? ? ? ? ? ? ? ? ?;
 case: B => dB [tb|] ? ? ? ? ? ? ? ? ? ? ? ? ?;
 case: C => dC [tc|] ? ? ? ? ? ? ? ? ? ? ? ? ? //=.
@@ -2122,7 +2122,7 @@ Qed.
 Lemma gemm_two_rank A B a t :
   gemm_two_inputs A B a = Success t -> size (get_dims t) = 2%nat.
 Proof.
-rewrite /gemm_two_inputs; case: (get_gemm_attributes a) => [[[al be] tA] tB].
+move=> /(proj2 (gemm_2_equiv_success _ _ _ _)); rewrite /gemm_two_inputs'; case: (get_gemm_attributes a) => [[[al be] tA] tB].
 case: A => dA [ta|] ? ? ? ? ? ? ? ? ? ? ? ? ?;
 case: B => dB [tb|] ? ? ? ? ? ? ? ? ? ? ? ? ? //=.
 case: (Z_of_int32 ta) => [|p|p] //=; do ? case: p => [p|p|] //=;
@@ -2137,7 +2137,7 @@ Qed.
 Lemma gemm_rank A B C a t :
   gemm A B C a = Success t -> size (get_dims t) = 2%nat.
 Proof.
-rewrite /gemm; case: (get_gemm_attributes a) => [[[al be] tA] tB].
+move=> /(proj2 (gemm_equiv_success _ _ _ _ _)); rewrite /gemm'; case: (get_gemm_attributes a) => [[[al be] tA] tB].
 case: A => dA [ta|] ? ? ? ? ? ? ? ? ? ? ? ? ?;
 case: B => dB [tb|] ? ? ? ? ? ? ? ? ? ? ? ? ?;
 case: C => dC [tc|] ? ? ? ? ? ? ? ? ? ? ? ? ? //=.
@@ -2223,7 +2223,7 @@ Lemma gemm_two_mat_dims A B a t :
     if Z_of_int64 tB is 0%Z then (mat_dims (get_dims B)).2 else (mat_dims (get_dims B)).1)).
 Proof.
 move=> SA SB.
-rewrite /gemm_two_inputs; case: (get_gemm_attributes a) => [[[al be] ta] tb].
+move=> /(proj2 (gemm_2_equiv_success _ _ _ _)); rewrite /gemm_two_inputs'; case: (get_gemm_attributes a) => [[[al be] ta] tb].
 case/tensorProtoSizedP: (SA) => dimsA dA ? ? ? ? ? ? ? ? ? ? ? ? ? EA DA _ _;
 case/tensorProtoSizedP: (SB) => dimsB dB ? ? ? ? ? ? ? ? ? ? ? ? ? EB DB _ _;
 rewrite {1}EA {1}EB; cbv beta iota zeta; first [rewrite (DataType_float DA) | rewrite (DataType_int32 DA) | rewrite (DataType_int64 DA)]; first [rewrite (DataType_float DB) | rewrite (DataType_int32 DB) | rewrite (DataType_int64 DB)]; cbv iota; try by [].
@@ -2267,7 +2267,7 @@ Lemma gemm_mat_dims A B C a t :
     if Z_of_int64 tB is 0%Z then (mat_dims (get_dims B)).2 else (mat_dims (get_dims B)).1)).
 Proof.
 move=> SA SB SC.
-rewrite /gemm; case: (get_gemm_attributes a) => [[[al be] ta] tb].
+move=> /(proj2 (gemm_equiv_success _ _ _ _ _)); rewrite /gemm'; case: (get_gemm_attributes a) => [[[al be] ta] tb].
 case/tensorProtoSizedP: (SA) => dimsA dA ? ? ? ? ? ? ? ? ? ? ? ? ? EA DA _ _.
 all: case/tensorProtoSizedP: (SB) => dimsB dB ? ? ? ? ? ? ? ? ? ? ? ? ? EB DB _ _.
 all: case/tensorProtoSizedP: (SC) => dimsC dC ? ? ? ? ? ? ? ? ? ? ? ? ? EC DC _ _.

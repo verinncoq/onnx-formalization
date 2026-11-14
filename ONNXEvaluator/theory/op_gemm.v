@@ -242,7 +242,7 @@ Definition get_gemm_attributes (a: list AttributeProto) : (float32 * float32 * i
   (alpha, beta, transA, transB).
 
 (*Computes Gemm for three inputs, as definied by ONNX*)
-Definition gemm (A B C: TensorProto) (a: list AttributeProto) : error_option TensorProto :=
+Definition gemm' (A B C: TensorProto) (a: list AttributeProto) : error_option TensorProto :=
   let (r1, transB) := get_gemm_attributes a in
   let (r2, transA) := r1 in
   let (alpha, beta) := r2 in
@@ -321,7 +321,7 @@ Definition gemm (A B C: TensorProto) (a: list AttributeProto) : error_option Ten
 From Flocq Require Import Bits BinarySingleNaN.
 
 (*Computes Gemm for two inputs, as definied by ONNX. The third input is initialized to zero for the other functions calls.*)
-Definition gemm_two_inputs (A B: TensorProto) (a: list AttributeProto) : error_option TensorProto :=
+Definition gemm_two_inputs' (A B: TensorProto) (a: list AttributeProto) : error_option TensorProto :=
   let (r1, transB) := get_gemm_attributes a in
   let (r2, transA) := r1 in
   let (alpha, beta) := r2 in
@@ -493,8 +493,14 @@ Definition mgemm {R : validType} (A B C : matrix R) (alpha : R) (beta : R)
   let scaled_C_b := scale_matrix C_b beta in
   matrix_addition alpha_A'_B' scaled_C_b.
 
-Definition gemm_3 {R : validType} (a: list AttributeProto) (A B C : tensor R)
+From mathcomp Require Import tuple.
+Open Scope form_scope.
+
+Definition gemm_3 (a: list AttributeProto) {R : validType} (ts : 3.-tuple (tensor R))
   : error_option (tensor R) :=
+  let A := [tnth ts 0] in
+  let B := [tnth ts 1] in
+  let C := [tnth ts 2] in
   let (r1, transB) := get_gemm_attributes a in
   let (r2, transA) := r1 in
   let (alpha, beta) := r2 in
@@ -509,8 +515,10 @@ Definition gemm_3 {R : validType} (a: list AttributeProto) (A B C : tensor R)
   | _, _ => Error "Could not convert attributes into valid type."
   end.
 
-Definition gemm_2 {R : validType} (a : list AttributeProto) (A B : tensor R)
+Definition gemm_2 (a : list AttributeProto) {R : validType} (ts : 2.-tuple (tensor R))
   : error_option (tensor R) :=
+  let A := [tnth ts 0] in
+  let B := [tnth ts 1] in
   let (r1, transB) := get_gemm_attributes a in
   let (r2, transA) := r1 in
   let (alpha, beta) := r2 in
@@ -524,6 +532,13 @@ Definition gemm_2 {R : validType} (a : list AttributeProto) (A B : tensor R)
   | _, _ => Error "Could not convert attributes into valid type."
   end.
 
+Definition gemm (A B C : TensorProto) (attribs : list AttributeProto)
+  : error_option (TensorProto) :=
+  apply_op (@gemm_3 attribs) [tuple A; B; C].
+
+Definition gemm_two_inputs (A B : TensorProto) (attribs : list AttributeProto)
+  : error_option (TensorProto) :=
+  apply_op (@gemm_2 attribs) [tuple A; B].
 
 (** * Equivalence of the old Gemm and the [apply_op] form
 
@@ -837,13 +852,9 @@ Qed.
 (** ** Gemm with three inputs *)
 
 Theorem gemm_equiv (A B C : TensorProto) (a : list AttributeProto) :
-  getValue (gemm A B C a) =
-  getValue (apply_op (k:=2)
-              (fun R xs => gemm_3 a (thead xs) (thead (behead_tuple xs))
-                                  (thead (behead_tuple (behead_tuple xs))))
-              (cons_tuple A (cons_tuple B (cons_tuple C (nil_tuple _))))).
+  getValue (gemm' A B C a) = getValue (gemm A B C a).
 Proof.
-  unfold gemm, gemm_3.
+  unfold gemm', gemm, gemm_3.
   destruct (get_gemm_attributes a) as [[[alpha beta] tA] tB].
   destruct A as [dA [ta|] sgA fA iA sA lA nA cA rA eA oA gA uA mA];
   destruct B as [dB [tb|] sgB fB iB sB lB nB cB rB eB oB gB uB mB];
@@ -887,15 +898,37 @@ Proof.
 Qed.
 
 
+(** Same result on success, and failure in exactly the same cases
+    (only the error message may differ). *)
+Corollary gemm_equiv_success (A B C : TensorProto) (a : list AttributeProto) (t : TensorProto) :
+  gemm' A B C a = Success t <-> gemm A B C a = Success t.
+Proof.
+  pose proof (gemm_equiv A B C a) as H.
+  destruct (gemm' A B C a), (gemm A B C a); cbn in H; split; intro E;
+    try discriminate; congruence.
+Qed.
+
+Corollary gemm_equiv_error (A B C : TensorProto) (a : list AttributeProto) :
+  (exists e, gemm' A B C a = Error e) <-> (exists e, gemm A B C a = Error e).
+Proof.
+  pose proof (gemm_equiv A B C a) as H.
+  destruct (gemm' A B C a), (gemm A B C a); cbn in H; split; intros [e E];
+    try discriminate; eauto.
+Qed.
+
+Corollary gemm_equiv_isSuccess (A B C : TensorProto) (a : list AttributeProto) :
+  isSuccess (gemm' A B C a) = isSuccess (gemm A B C a).
+Proof.
+  pose proof (gemm_equiv A B C a) as H.
+  destruct (gemm' A B C a), (gemm A B C a); cbn in H; try discriminate; reflexivity.
+Qed.
+
 (** ** Gemm with two inputs *)
 
 Theorem gemm_2_equiv (A B : TensorProto) (a : list AttributeProto) :
-  getValue (gemm_two_inputs A B a) =
-  getValue (apply_op (k:=1)
-              (fun R xs => gemm_2 a (thead xs) (thead (behead_tuple xs)))
-              (cons_tuple A (cons_tuple B (nil_tuple _)))).
+  getValue (gemm_two_inputs' A B a) = getValue (gemm_two_inputs A B a).
 Proof.
-  unfold gemm_two_inputs, gemm_2.
+  unfold gemm_two_inputs', gemm_two_inputs, gemm_2.
   destruct (get_gemm_attributes a) as [[[alpha beta] tA] tB].
   destruct A as [dA [ta|] sgA fA iA sA lA nA cA rA eA oA gA uA mA];
   destruct B as [dB [tb|] sgB fB iB sB lB nB cB rB eB oB gB uB mB];
@@ -933,4 +966,29 @@ Proof.
   all: cbn [ebind fst snd];
        rewrite ?gemm_float32_mgemm, ?gemm_int32_mgemm, ?gemm_int64_mgemm;
        destruct (mgemm _ _ _ _ _ _ _ _); reflexivity.
+Qed.
+
+(** Same result on success, and failure in exactly the same cases
+    (only the error message may differ). *)
+Corollary gemm_2_equiv_success (A B : TensorProto) (a : list AttributeProto) (t : TensorProto) :
+  gemm_two_inputs' A B a = Success t <-> gemm_two_inputs A B a = Success t.
+Proof.
+  pose proof (gemm_2_equiv A B a) as H.
+  destruct (gemm_two_inputs' A B a), (gemm_two_inputs A B a); cbn in H; split; intro E;
+    try discriminate; congruence.
+Qed.
+
+Corollary gemm_2_equiv_error (A B : TensorProto) (a : list AttributeProto) :
+  (exists e, gemm_two_inputs' A B a = Error e) <-> (exists e, gemm_two_inputs A B a = Error e).
+Proof.
+  pose proof (gemm_2_equiv A B a) as H.
+  destruct (gemm_two_inputs' A B a), (gemm_two_inputs A B a); cbn in H; split; intros [e E];
+    try discriminate; eauto.
+Qed.
+
+Corollary gemm_2_equiv_isSuccess (A B : TensorProto) (a : list AttributeProto) :
+  isSuccess (gemm_two_inputs' A B a) = isSuccess (gemm_two_inputs A B a).
+Proof.
+  pose proof (gemm_2_equiv A B a) as H.
+  destruct (gemm_two_inputs' A B a), (gemm_two_inputs A B a); cbn in H; try discriminate; reflexivity.
 Qed.
