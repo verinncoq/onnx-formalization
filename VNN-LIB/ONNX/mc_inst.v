@@ -17,10 +17,17 @@ Import Order.DefaultSeqProdOrder.
 Import Order.DefaultProdOrder.
 Open Scope order_scope.
 
-(** This is seemingly not actually used. Instead, the type of the tensor takes in
- many datatypes as options/lists (so they can be empty). This is not compatible
- with the interface, which expects the entire tensor to be typed under a single
- coherent type. **)
+HB.mixin Record hasOps T & Equality T := {
+    zero : T;
+    add : T -> T -> T;
+    mul : T -> T -> T;
+    le : rel T;
+    lt : rel T;
+  }.
+
+#[short(type="validOpType")]
+HB.structure Definition ValidOp := {T of Equality T & hasOps T}.
+(* Check (forall (R : validOpType), R : eqType). *)
 
 Definition DataType_TensorProtoEq : rel DataType_TensorProto :=
   fun t1 t2 =>
@@ -184,6 +191,32 @@ HB.instance Definition _ := hasDecEq.Build (Binary.binary_float prec emax)
                             binaryEqP.
 
 End Binary.
+
+HB.instance Definition _ := Equality.copy int32 (byte * byte * byte * byte)%type.
+HB.instance Definition _ :=
+  Equality.copy int64 (byte * byte * byte * byte * byte * byte * byte * byte)%type.
+HB.instance Definition _ := Equality.copy float32 (Binary.binary_float 24 128).
+
+HB.instance Definition _ := hasOps.Build int32
+                                         (int32_of_Z 0%Z)
+                                         (fun x y => int32_of_Z ((Z_of_int32 x) + (Z_of_int32 y))%Z)
+                                         (fun x y => int32_of_Z ((Z_of_int32 x) * (Z_of_int32 y))%Z)
+                                         (fun x y => (Z_of_int32 x) <=? (Z_of_int32 y))%Z
+                                         (fun x y => (Z_of_int32 x) <? (Z_of_int32 y))%Z.
+
+HB.instance Definition _ := hasOps.Build int64
+                                         (int64_of_Z 0%Z)
+                                         (fun x y => int64_of_Z ((Z_of_int64 x) + (Z_of_int64 y))%Z)
+                                         (fun x y => int64_of_Z ((Z_of_int64 x) * (Z_of_int64 y))%Z)
+                                         (fun x y => (Z_of_int64 x) <=? (Z_of_int64 y))%Z
+                                         (fun x y => (Z_of_int64 x) <? (Z_of_int64 y))%Z.
+
+HB.instance Definition _ := hasOps.Build float32
+  (Binary.B754_zero 24 128 false)
+  (b32_plus BinarySingleNaN.mode_NE)
+  (b32_mult BinarySingleNaN.mode_NE)
+  (fun x y => BinarySingleNaN.Bleb (Binary.B2BSN 24 128 x) (Binary.B2BSN 24 128 y))
+  (fun x y => BinarySingleNaN.Bltb (Binary.B2BSN 24 128 x) (Binary.B2BSN 24 128 y)).
 
 Definition stringEqP : Equality.axiom String.eqb.
 Proof.
@@ -887,13 +920,14 @@ Definition storage_of (data_type : option int32) : tensor_storage :=
       end
   end.
 
-(** Canonical representative: keep dims, data_type, name and the data field
- data_type selects, and reset every other field to its default. **)
+(** Canonical representative: keep dims, data_type and the data field
+ data_type selects, and reset every other field (the name included) to its
+ default. **)
 Definition canon_tensor (t : TensorProto) : TensorProto :=
   match t with
-  | TensorProto_constructor dims dt _ fd i32d sd i64d name _ _ _ _ dd u64d _ =>
+  | TensorProto_constructor dims dt _ fd i32d sd i64d _ _ _ _ _ dd u64d _ =>
       let mk fd i32d sd i64d dd u64d :=
-        TensorProto_constructor dims dt None fd i32d sd i64d name None None nil None dd u64d nil in
+        TensorProto_constructor dims dt None fd i32d sd i64d None None None nil None dd u64d nil in
       match storage_of dt with
       | FloatStorage  => mk fd  nil  nil nil  nil nil
       | Int32Storage  => mk nil i32d nil nil  nil nil

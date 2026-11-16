@@ -111,3 +111,6 @@ HB.instance Definition _ := isEqQuotient.Build TensorProto tensor_eqmod qTensor 
 Lemma qtensor_eqmodP (x y : TensorProto) :
   reflect (x = y %[mod qTensor]) (tensor_eqmod x y).
 Proof. by rewrite -qtensor_pi_eq; apply: eqP. Qed.
+
+Lemma qtensor_piK (t : qTensor) : \pi_qTensor (qtensor_val t) = t.
+Proof. by rewrite unlock; exact: qtensor_reprK. Qed.

@@ -593,7 +593,7 @@ Definition tensorNamed (t : TensorProto) : bool :=
   end.
 
 Definition sized_tensor : eqType :=
-  { p : qTensor | tensorProtoSized p && tensorNamed p}.
+  { p : qTensor | tensorProtoSized p }.
 
 Definition well_formed_tensor (t : TensorType Elem) : eqType :=
   { p : sized_tensor | dims_match (val p) (tensorDims _ t)

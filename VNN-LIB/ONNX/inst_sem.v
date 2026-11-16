@@ -25,17 +25,14 @@ Open Scope quotient_scope.
 (**************** SEMANTICS *****************)
 (********************************************)
 
-Definition denote (x : ElementType syntax_inst) : eqType :=
+Definition denote (x : ElementType syntax_inst) : validOpType :=
   match x with
   | exist x Px =>
-      match x as x0 return (x0 \in supported_types) -> eqType with
+      match x as x0 return (x0 \in supported_types) -> validOpType with
       | FLOAT_TensorProto => fun=> float32
       | INT32_TensorProto => fun=> int32
       | INT64_TensorProto => fun=> int64
-      | STRING_TensorProto => fun=> string
-      | DOUBLE_TensorProto => fun=> float64
-      | UINT64_TensorProto => fun=> uint64
-      | _ => fun Px => False_rect eqType (notF Px)
+      | _ => fun Px => False_rect validOpType (notF Px)
       end Px
 end.
 
@@ -102,7 +99,7 @@ Definition theoryTensorProto (t : TensorType (ElementType syntax_inst)) :
   match t with
   | tensorType (exist x Hx) (existT k dims) => fun p =>
     match p with
-    | exist (exist q Hq) Hw => tensorProto_tensor dims x Hx (qtensor_val q) Hw (andP Hq).1
+    | exist (exist q Hq) Hw => tensorProto_tensor dims x Hx (qtensor_val q) Hw Hq
     end
   end.
 
@@ -121,16 +118,24 @@ model_well_formed (the fuel by acyclic_at, as in evaluation_cannot_fail).
 Intermediate vertices evaluate to a tensor of some type d'.
 *)
 
-Definition gemm_2_inputs {R} {m n p} (zero : R) (mul : R -> R -> R) (add : R -> R -> R)
-(a b : R) (m1 : 'M[R]_(m, n)) (m2 : 'M[R]_(n, p)) : 'M[R]_(m, p) :=
+Definition gemm_2_inputs {R : validOpType} {m n p} (a b : R) (m1 : 'M[R]_(m, n))
+  (m2 : 'M[R]_(n, p)) : 'M[R]_(m,p) :=
   \matrix[mulmx_key]_(i, k) \big[add/zero]_j (add (mul (mul a (m1 i j)) (m2 j k)) (mul b zero)).
 
-Definition gemm_3_inputs {R} {m n p} (zero : R) (mul : R -> R -> R) (add : R -> R -> R)
-(a b : R) (m1 : 'M[R]_(m, n)) (m2 : 'M[R]_(n, p)) (m3 : 'M[R]_(m, p)) : 'M[R]_(m, p) :=
+Definition gemm_3_inputs {R : validOpType} {m n p}
+  (a b : R) (m1 : 'M[R]_(m, n)) (m2 : 'M[R]_(n, p)) (m3 : 'M[R]_(m, p))
+ : 'M[R]_(m, p) :=
   (map2_mx (fun x y => add x (mul b y)) (\matrix[mulmx_key]_(i, k) \big[add/zero]_j (mul (mul (m1 i j) a) (m2 j k))) m3).
 
-Definition op_relu {R} {m n} (zero : R) (lt : R -> R -> bool)
-                   (m1 : 'M[R]_(m, n)) : 'M[R]_(m, n) :=
+(* Definition gemm_2_inputs {R} {m n p} (zero : R) (mul : R -> R -> R) (add : R -> R -> R) *)
+(*   (a b : R) (m1 : 'M[R]_(m, n)) (m2 : 'M[R]_(n, p)) : 'M[R]_(m, p) := *)
+(*   \matrix[mulmx_key]_(i, k) \big[add/zero]_j (add (mul (mul a (m1 i j)) (m2 j k)) (mul b zero)). *)
+
+(* Definition gemm_3_inputs {R} {m n p} (zero : R) (mul : R -> R -> R) (add : R -> R -> R) *)
+(*   (a b : R) (m1 : 'M[R]_(m, n)) (m2 : 'M[R]_(n, p)) (m3 : 'M[R]_(m, p)) : 'M[R]_(m, p) := *)
+(*   (map2_mx (fun x y => add x (mul b y)) (\matrix[mulmx_key]_(i, k) \big[add/zero]_j (mul (mul (m1 i j) a) (m2 j k))) m3). *)
+
+Definition op_relu {R : validOpType} {m n} (m1 : 'M[R]_(m, n)) : 'M[R]_(m, n) :=
   map_mx (fun x => if lt x zero then zero else x) m1.
 
 Open Scope fmap_scope.
@@ -501,23 +506,6 @@ Definition Z_of_float32_int (f : float32) (H : isSome (Z_of_float32 f)) : Z :=
   | None => fun H => False_rect _ (notF H)
   end H.
 
-(** The zero, product and sum of a supported element type, as in op_gemm. **)
-Definition elem_ops (x : Elem) :
-  denote x * (denote x -> denote x -> denote x) * (denote x -> denote x -> denote x) :=
-  match x as x0 return
-    denote x0 * (denote x0 -> denote x0 -> denote x0) * (denote x0 -> denote x0 -> denote x0)
-  with
-  | exist FLOAT_TensorProto _ =>
-      (Binary.B754_zero 24 128 false, b32_mult BinarySingleNaN.mode_NE, b32_plus BinarySingleNaN.mode_NE)
-  | exist INT32_TensorProto _ =>
-      (int32_of_Z 0, fun a b => int32_of_Z (Z_of_int32 a * Z_of_int32 b)%Z,
-                     fun a b => int32_of_Z (Z_of_int32 a + Z_of_int32 b)%Z)
-  | exist INT64_TensorProto _ =>
-      (int64_of_Z 0, fun a b => int64_of_Z (Z_of_int64 a * Z_of_int64 b)%Z,
-                     fun a b => int64_of_Z (Z_of_int64 a + Z_of_int64 b)%Z)
-  | exist _ Hx => False_rect _ (notF Hx)
-  end.
-
 (** A float attribute as an element: itself over floats, and over an integer
 dtype the integer it is. **)
 Definition elem_of_float32 (x : Elem) (f : float32)
@@ -553,40 +541,24 @@ Definition interp_gemm (x : Elem) (A B : M2 (denote x)) (C : option (M2 (denote 
   (Hk : (trans_shape (gemm_transB attribs) (projT1 B, projT1 (projT2 B))).1%:num
         = (trans_shape (gemm_transA attribs) (projT1 A, projT1 (projT2 A))).2%:num)
   : T (denote x) :=
-  let ops := elem_ops x in
   let alpha := elem_of_float32 x (gemm_alpha attribs) (gemm_int_alpha Hint) in
   let beta := elem_of_float32 x (gemm_beta attribs) (gemm_int_beta Hint) in
   let A' := trans_mx (gemm_transA attribs) (matrix_of_ntensor (projT2 (projT2 A))) in
   let B' := castmx (Hk, erefl) (trans_mx (gemm_transB attribs) (matrix_of_ntensor (projT2 (projT2 B)))) in
   match C with
-  | Some C => tensor_of_mx (gemm_3_inputs ops.1.1 ops.1.2 ops.2 alpha beta A' B'
+  | Some C => tensor_of_mx (gemm_3_inputs alpha beta A' B'
                               (bcast_mx (matrix_of_ntensor (projT2 (projT2 C)))))
-  | None => tensor_of_mx (gemm_2_inputs ops.1.1 ops.1.2 ops.2 alpha beta A' B')
-  end.
-
-(** The value negatives become, and the comparison, of a supported element
-type, as in op_relu. **)
-Definition relu_ops (x : Elem) : denote x * (denote x -> denote x -> bool) :=
-  match x as x0 return denote x0 * (denote x0 -> denote x0 -> bool) with
-  | exist FLOAT_TensorProto _ =>
-      (Binary.B754_zero 24 128 true,
-       fun a b => if a is Binary.B754_finite true _ _ _
-                  then (if Binary.Bcompare 24 128 a b is Some Lt then true else false)
-                  else false)
-  | exist INT32_TensorProto _ => (int32_of_Z 0, fun a b => (Z_of_int32 a <? Z_of_int32 b)%Z)
-  | exist INT64_TensorProto _ => (int64_of_Z 0, fun a b => (Z_of_int64 a <? Z_of_int64 b)%Z)
-  | exist _ Hx => False_rect _ (notF Hx)
+  | None => tensor_of_mx (gemm_2_inputs alpha beta A' B')
   end.
 
 (** The value of a Relu node on the value of its input: relu on every entry
 of the tensor, read as its matrix of entries and cast back. Any rank. **)
 Definition interp_relu (A : {x : Elem & T (denote x)}) : {x : Elem & T (denote x)} :=
   let x := projT1 A in
-  let ops := relu_ops x in
   existT (fun x => T (denote x)) x
     (existT (fun k => {us : {posnum nat} ^ k & 'nT[denote x]_(us)}) (projT1 (projT2 A))
        (existT (fun us => 'nT[denote x]_(us)) (projT1 (projT2 (projT2 A)))
-          (Tensor (op_relu ops.1 ops.2 (tensor_val (projT2 (projT2 (projT2 A)))))))).
+          (Tensor (op_relu (tensor_val (projT2 (projT2 (projT2 A)))))))).
 
 (** gamma with v bound to every name in outs. **)
 Definition bind_outputs (gamma : {fmap string -> {x : Elem & T (denote x)}})
@@ -1704,13 +1676,13 @@ Definition semantics_inst : NetworkTheorySemantics syntax_inst :=
       elementType := denote;
       theoryTensor := theoryTensorProto;
       model := modelTensorProto;
-      le := tle;
-      lt := tlt;
+      Semantics.le := tle;
+      Semantics.lt := tlt;
       ge := tge;
       gt := tgt;
       eq := teq;
       neq := tneq;
       neg := tneg;
-      add := tadd;
-      mul := tmul;
+      Semantics.add := tadd;
+      Semantics.mul := tmul;
   |}.
