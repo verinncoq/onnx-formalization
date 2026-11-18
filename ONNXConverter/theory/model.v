@@ -22,41 +22,41 @@ Inductive Version :=
 | IR_VERSION
 .
 
-Inductive IntIntListEntryProto :=
-| IntIntListEntryProto_constructor: 
-option int64 (*key*) -> 
-list int64 (*value*) -> 
-IntIntListEntryProto.
+Record IntIntListEntryProto := 
+IntIntListEntryProto_constructor {
+IntIntListEntryProto_key : option int64;
+IntIntListEntryProto_value : list int64;
+}.
 
 Inductive dim_SimpleShardedDimProto :=
 | dim_value_dim_SimpleShardedDimProto: int64 -> dim_SimpleShardedDimProto
 | dim_param_dim_SimpleShardedDimProto: string -> dim_SimpleShardedDimProto
 .
 
-Inductive SimpleShardedDimProto :=
-| SimpleShardedDimProto_constructor: 
-option dim_SimpleShardedDimProto (**) -> 
-option int64 (*num_shards*) -> 
-SimpleShardedDimProto.
+Record SimpleShardedDimProto := 
+SimpleShardedDimProto_constructor {
+SimpleShardedDimProto_dim_SimpleShardedDimProto : option dim_SimpleShardedDimProto;
+SimpleShardedDimProto_num_shards : option int64;
+}.
 
-Inductive DeviceConfigurationProto :=
-| DeviceConfigurationProto_constructor: 
-option string (*name*) -> 
-option int32 (*num_devices*) -> 
-list string (*device*) -> 
-DeviceConfigurationProto.
+Record DeviceConfigurationProto := 
+DeviceConfigurationProto_constructor {
+DeviceConfigurationProto_name : option string;
+DeviceConfigurationProto_num_devices : option int32;
+DeviceConfigurationProto_device : list string;
+}.
 
-Inductive StringStringEntryProto :=
-| StringStringEntryProto_constructor: 
-option string (*key*) -> 
-option string (*value*) -> 
-StringStringEntryProto.
+Record StringStringEntryProto := 
+StringStringEntryProto_constructor {
+StringStringEntryProto_key : option string;
+StringStringEntryProto_value : option string;
+}.
 
-Inductive TensorAnnotation :=
-| TensorAnnotation_constructor: 
-option string (*tensor_name*) -> 
-list StringStringEntryProto (*quant_parameter_tensor_names*) -> 
-TensorAnnotation.
+Record TensorAnnotation := 
+TensorAnnotation_constructor {
+TensorAnnotation_tensor_name : option string;
+TensorAnnotation_quant_parameter_tensor_names : list StringStringEntryProto;
+}.
 
 Inductive DataType_TensorProto :=
 | UNDEFINED_TensorProto
@@ -85,86 +85,86 @@ Inductive DataType_TensorProto :=
 | FLOAT4E2M1_TensorProto
 .
 
-Inductive Segment_TensorProto :=
-| Segment_TensorProto_constructor: 
-option int64 (*begin*) -> 
-option int64 (*end*) -> 
-Segment_TensorProto.
+Record Segment_TensorProto := 
+Segment_TensorProto_constructor {
+Segment_TensorProto_begin : option int64;
+Segment_TensorProto_end : option int64;
+}.
 
 Inductive DataLocation_TensorProto :=
 | DEFAULT_TensorProto
 | EXTERNAL_TensorProto
 .
 
-Inductive TensorProto :=
-| TensorProto_constructor: 
-list int64 (*dims*) -> 
-option int32 (*data_type*) -> 
-option Segment_TensorProto (*segment*) -> 
-list float32 (*float_data*) -> 
-list int32 (*int32_data*) -> 
-list bytes (*string_data*) -> 
-list int64 (*int64_data*) -> 
-option string (*name*) -> 
-option string (*doc_string*) -> 
-option bytes (*raw_data*) -> 
-list StringStringEntryProto (*external_data*) -> 
-option DataLocation_TensorProto (*data_location*) -> 
-list float64 (*double_data*) -> 
-list uint64 (*uint64_data*) -> 
-list StringStringEntryProto (*metadata_props*) -> 
-TensorProto.
+Record TensorProto := 
+TensorProto_constructor {
+TensorProto_dims : list int64;
+TensorProto_data_type : option int32;
+TensorProto_segment : option Segment_TensorProto;
+TensorProto_float_data : list float32;
+TensorProto_int32_data : list int32;
+TensorProto_string_data : list bytes;
+TensorProto_int64_data : list int64;
+TensorProto_name : option string;
+TensorProto_doc_string : option string;
+TensorProto_raw_data : option bytes;
+TensorProto_external_data : list StringStringEntryProto;
+TensorProto_data_location : option DataLocation_TensorProto;
+TensorProto_double_data : list float64;
+TensorProto_uint64_data : list uint64;
+TensorProto_metadata_props : list StringStringEntryProto;
+}.
 
-Inductive SparseTensorProto :=
-| SparseTensorProto_constructor: 
-option TensorProto (*values*) -> 
-option TensorProto (*indices*) -> 
-list int64 (*dims*) -> 
-SparseTensorProto.
+Record SparseTensorProto := 
+SparseTensorProto_constructor {
+SparseTensorProto_values : option TensorProto;
+SparseTensorProto_indices : option TensorProto;
+SparseTensorProto_dims : list int64;
+}.
 
 Inductive value_Dimension_TensorShapeProto :=
 | dim_value_value_Dimension_TensorShapeProto: int64 -> value_Dimension_TensorShapeProto
 | dim_param_value_Dimension_TensorShapeProto: string -> value_Dimension_TensorShapeProto
 .
 
-Inductive Dimension_TensorShapeProto :=
-| Dimension_TensorShapeProto_constructor: 
-option value_Dimension_TensorShapeProto (**) -> 
-option string (*denotation*) -> 
-Dimension_TensorShapeProto.
+Record Dimension_TensorShapeProto := 
+Dimension_TensorShapeProto_constructor {
+Dimension_TensorShapeProto_value_Dimension_TensorShapeProto : option value_Dimension_TensorShapeProto;
+Dimension_TensorShapeProto_denotation : option string;
+}.
 
-Inductive TensorShapeProto :=
-| TensorShapeProto_constructor: 
-list Dimension_TensorShapeProto (*dim*) -> 
-TensorShapeProto.
+Record TensorShapeProto := 
+TensorShapeProto_constructor {
+TensorShapeProto_dim : list Dimension_TensorShapeProto;
+}.
 
-Inductive Tensor_TypeProto :=
-| Tensor_TypeProto_constructor: 
-option int32 (*elem_type*) -> 
-option TensorShapeProto (*shape*) -> 
-Tensor_TypeProto.
+Record Tensor_TypeProto := 
+Tensor_TypeProto_constructor {
+Tensor_TypeProto_elem_type : option int32;
+Tensor_TypeProto_shape : option TensorShapeProto;
+}.
 
-Inductive Sequence_TypeProto :=
-| Sequence_TypeProto_constructor: 
-option string (*elem_type*) -> 
-Sequence_TypeProto.
+Record Sequence_TypeProto := 
+Sequence_TypeProto_constructor {
+Sequence_TypeProto_elem_type : option string;
+}.
 
-Inductive Map_TypeProto :=
-| Map_TypeProto_constructor: 
-option int32 (*key_type*) -> 
-option string (*value_type*) -> 
-Map_TypeProto.
+Record Map_TypeProto := 
+Map_TypeProto_constructor {
+Map_TypeProto_key_type : option int32;
+Map_TypeProto_value_type : option string;
+}.
 
-Inductive Optional_TypeProto :=
-| Optional_TypeProto_constructor: 
-option string (*elem_type*) -> 
-Optional_TypeProto.
+Record Optional_TypeProto := 
+Optional_TypeProto_constructor {
+Optional_TypeProto_elem_type : option string;
+}.
 
-Inductive SparseTensor_TypeProto :=
-| SparseTensor_TypeProto_constructor: 
-option int32 (*elem_type*) -> 
-option TensorShapeProto (*shape*) -> 
-SparseTensor_TypeProto.
+Record SparseTensor_TypeProto := 
+SparseTensor_TypeProto_constructor {
+SparseTensor_TypeProto_elem_type : option int32;
+SparseTensor_TypeProto_shape : option TensorShapeProto;
+}.
 
 Inductive value_TypeProto :=
 | tensor_type_value_TypeProto: Tensor_TypeProto -> value_TypeProto
@@ -174,17 +174,17 @@ Inductive value_TypeProto :=
 | sparse_tensor_type_value_TypeProto: SparseTensor_TypeProto -> value_TypeProto
 .
 
-Inductive TypeProto :=
-| TypeProto_constructor: 
-option value_TypeProto (**) -> 
-option string (*denotation*) -> 
-TypeProto.
+Record TypeProto := 
+TypeProto_constructor {
+TypeProto_value_TypeProto : option value_TypeProto;
+TypeProto_denotation : option string;
+}.
 
-Inductive OperatorSetIdProto :=
-| OperatorSetIdProto_constructor: 
-option string (*domain*) -> 
-option int64 (*version*) -> 
-OperatorSetIdProto.
+Record OperatorSetIdProto := 
+OperatorSetIdProto_constructor {
+OperatorSetIdProto_domain : option string;
+OperatorSetIdProto_version : option int64;
+}.
 
 Inductive OperatorStatus :=
 | EXPERIMENTAL
@@ -209,119 +209,119 @@ Inductive AttributeType_AttributeProto :=
 | TYPE_PROTOS_AttributeProto
 .
 
-Inductive AttributeProto :=
-| AttributeProto_constructor: 
-option string (*name*) -> 
-option string (*ref_attr_name*) -> 
-option string (*doc_string*) -> 
-option AttributeType_AttributeProto (*type*) -> 
-option float32 (*f*) -> 
-option int64 (*i*) -> 
-option bytes (*s*) -> 
-option TensorProto (*t*) -> 
-option SparseTensorProto (*sparse_tensor*) -> 
-option TypeProto (*tp*) -> 
-list float32 (*floats*) -> 
-list int64 (*ints*) -> 
-list bytes (*strings*) -> 
-list TensorProto (*tensors*) -> 
-list SparseTensorProto (*sparse_tensors*) -> 
-list TypeProto (*type_protos*) -> 
-AttributeProto.
+Record AttributeProto := 
+AttributeProto_constructor {
+AttributeProto_name : option string;
+AttributeProto_ref_attr_name : option string;
+AttributeProto_doc_string : option string;
+AttributeProto_type : option AttributeType_AttributeProto;
+AttributeProto_f : option float32;
+AttributeProto_i : option int64;
+AttributeProto_s : option bytes;
+AttributeProto_t : option TensorProto;
+AttributeProto_sparse_tensor : option SparseTensorProto;
+AttributeProto_tp : option TypeProto;
+AttributeProto_floats : list float32;
+AttributeProto_ints : list int64;
+AttributeProto_strings : list bytes;
+AttributeProto_tensors : list TensorProto;
+AttributeProto_sparse_tensors : list SparseTensorProto;
+AttributeProto_type_protos : list TypeProto;
+}.
 
-Inductive ValueInfoProto :=
-| ValueInfoProto_constructor: 
-option string (*name*) -> 
-option TypeProto (*type*) -> 
-option string (*doc_string*) -> 
-list StringStringEntryProto (*metadata_props*) -> 
-ValueInfoProto.
+Record ValueInfoProto := 
+ValueInfoProto_constructor {
+ValueInfoProto_name : option string;
+ValueInfoProto_type : option TypeProto;
+ValueInfoProto_doc_string : option string;
+ValueInfoProto_metadata_props : list StringStringEntryProto;
+}.
 
-Inductive ShardedDimProto :=
-| ShardedDimProto_constructor: 
-option int64 (*axis*) -> 
-list SimpleShardedDimProto (*simple_sharding*) -> 
-ShardedDimProto.
+Record ShardedDimProto := 
+ShardedDimProto_constructor {
+ShardedDimProto_axis : option int64;
+ShardedDimProto_simple_sharding : list SimpleShardedDimProto;
+}.
 
-Inductive ShardingSpecProto :=
-| ShardingSpecProto_constructor: 
-option string (*tensor_name*) -> 
-list int64 (*device*) -> 
-list IntIntListEntryProto (*index_to_device_group_map*) -> 
-list ShardedDimProto (*sharded_dim*) -> 
-ShardingSpecProto.
+Record ShardingSpecProto := 
+ShardingSpecProto_constructor {
+ShardingSpecProto_tensor_name : option string;
+ShardingSpecProto_device : list int64;
+ShardingSpecProto_index_to_device_group_map : list IntIntListEntryProto;
+ShardingSpecProto_sharded_dim : list ShardedDimProto;
+}.
 
-Inductive NodeDeviceConfigurationProto :=
-| NodeDeviceConfigurationProto_constructor: 
-option string (*configuration_id*) -> 
-list ShardingSpecProto (*sharding_spec*) -> 
-option int32 (*pipeline_stage*) -> 
-NodeDeviceConfigurationProto.
+Record NodeDeviceConfigurationProto := 
+NodeDeviceConfigurationProto_constructor {
+NodeDeviceConfigurationProto_configuration_id : option string;
+NodeDeviceConfigurationProto_sharding_spec : list ShardingSpecProto;
+NodeDeviceConfigurationProto_pipeline_stage : option int32;
+}.
 
-Inductive NodeProto :=
-| NodeProto_constructor: 
-list string (*input*) -> 
-list string (*output*) -> 
-option string (*name*) -> 
-option string (*op_type*) -> 
-option string (*domain*) -> 
-option string (*overload*) -> 
-list AttributeProto (*attribute*) -> 
-option string (*doc_string*) -> 
-list StringStringEntryProto (*metadata_props*) -> 
-list NodeDeviceConfigurationProto (*device_configurations*) -> 
-NodeProto.
+Record NodeProto := 
+NodeProto_constructor {
+NodeProto_input : list string;
+NodeProto_output : list string;
+NodeProto_name : option string;
+NodeProto_op_type : option string;
+NodeProto_domain : option string;
+NodeProto_overload : option string;
+NodeProto_attribute : list AttributeProto;
+NodeProto_doc_string : option string;
+NodeProto_metadata_props : list StringStringEntryProto;
+NodeProto_device_configurations : list NodeDeviceConfigurationProto;
+}.
 
-Inductive GraphProto :=
-| GraphProto_constructor: 
-list NodeProto (*node*) -> 
-option string (*name*) -> 
-list TensorProto (*initializer*) -> 
-list SparseTensorProto (*sparse_initializer*) -> 
-option string (*doc_string*) -> 
-list ValueInfoProto (*input*) -> 
-list ValueInfoProto (*output*) -> 
-list ValueInfoProto (*value_info*) -> 
-list TensorAnnotation (*quantization_annotation*) -> 
-list StringStringEntryProto (*metadata_props*) -> 
-GraphProto.
+Record GraphProto := 
+GraphProto_constructor {
+GraphProto_node : list NodeProto;
+GraphProto_name : option string;
+GraphProto_initializer : list TensorProto;
+GraphProto_sparse_initializer : list SparseTensorProto;
+GraphProto_doc_string : option string;
+GraphProto_input : list ValueInfoProto;
+GraphProto_output : list ValueInfoProto;
+GraphProto_value_info : list ValueInfoProto;
+GraphProto_quantization_annotation : list TensorAnnotation;
+GraphProto_metadata_props : list StringStringEntryProto;
+}.
 
-Inductive FunctionProto :=
-| FunctionProto_constructor: 
-option string (*name*) -> 
-list string (*input*) -> 
-list string (*output*) -> 
-list string (*attribute*) -> 
-list AttributeProto (*attribute_proto*) -> 
-list NodeProto (*node*) -> 
-option string (*doc_string*) -> 
-list OperatorSetIdProto (*opset_import*) -> 
-option string (*domain*) -> 
-option string (*overload*) -> 
-list ValueInfoProto (*value_info*) -> 
-list StringStringEntryProto (*metadata_props*) -> 
-FunctionProto.
+Record FunctionProto := 
+FunctionProto_constructor {
+FunctionProto_name : option string;
+FunctionProto_input : list string;
+FunctionProto_output : list string;
+FunctionProto_attribute : list string;
+FunctionProto_attribute_proto : list AttributeProto;
+FunctionProto_node : list NodeProto;
+FunctionProto_doc_string : option string;
+FunctionProto_opset_import : list OperatorSetIdProto;
+FunctionProto_domain : option string;
+FunctionProto_overload : option string;
+FunctionProto_value_info : list ValueInfoProto;
+FunctionProto_metadata_props : list StringStringEntryProto;
+}.
 
-Inductive TrainingInfoProto :=
-| TrainingInfoProto_constructor: 
-option GraphProto (*initialization*) -> 
-option GraphProto (*algorithm*) -> 
-list StringStringEntryProto (*initialization_binding*) -> 
-list StringStringEntryProto (*update_binding*) -> 
-TrainingInfoProto.
+Record TrainingInfoProto := 
+TrainingInfoProto_constructor {
+TrainingInfoProto_initialization : option GraphProto;
+TrainingInfoProto_algorithm : option GraphProto;
+TrainingInfoProto_initialization_binding : list StringStringEntryProto;
+TrainingInfoProto_update_binding : list StringStringEntryProto;
+}.
 
-Inductive ModelProto :=
-| ModelProto_constructor: 
-option int64 (*ir_version*) -> 
-list OperatorSetIdProto (*opset_import*) -> 
-option string (*producer_name*) -> 
-option string (*producer_version*) -> 
-option string (*domain*) -> 
-option int64 (*model_version*) -> 
-option string (*doc_string*) -> 
-option GraphProto (*graph*) -> 
-list StringStringEntryProto (*metadata_props*) -> 
-list TrainingInfoProto (*training_info*) -> 
-list FunctionProto (*functions*) -> 
-list DeviceConfigurationProto (*configuration*) -> 
-ModelProto.
+Record ModelProto := 
+ModelProto_constructor {
+ModelProto_ir_version : option int64;
+ModelProto_opset_import : list OperatorSetIdProto;
+ModelProto_producer_name : option string;
+ModelProto_producer_version : option string;
+ModelProto_domain : option string;
+ModelProto_model_version : option int64;
+ModelProto_doc_string : option string;
+ModelProto_graph : option GraphProto;
+ModelProto_metadata_props : list StringStringEntryProto;
+ModelProto_training_info : list TrainingInfoProto;
+ModelProto_functions : list FunctionProto;
+ModelProto_configuration : list DeviceConfigurationProto;
+}.
