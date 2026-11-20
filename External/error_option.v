@@ -36,3 +36,5 @@ Definition error_option_compose {A B C: Type} (f: A -> error_option B) (g: B -> 
     | Success fx => g fx
     | Error s => Error s
     end.
+
+Notation "f |> g" := (error_option_compose f g) (at level 85).

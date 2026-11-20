@@ -13,9 +13,6 @@ From ONNXFormalization.ONNXConverter Require Export bytes_decoder.
 From ONNXFormalization.ONNXConverter Require Export conversion_functions.
 From ONNXFormalization.ONNXConverter Require Export onnx_model_to_premodel.
 
-
-Notation "f |> g" := (error_option_compose f g) (at level 85).
-
 (*define the modelProto_converter*)
 Definition modelProto_converter := convert_ModelProto.
 
