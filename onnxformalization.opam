@@ -16,6 +16,8 @@ depends: [
   "coq-flocq" {= "4.2.2"}
   "pbrt" {= "4.1"}
   "conf-protoc" {= "4.4.0"}
+  "menhir" {= "20250903"}
+  "coq-menhirlib" {= "20250903"}
   "rocq-mathcomp-boot" {= "2.6.0"}
   "rocq-mathcomp-algebra" {= "2.6.0"}
   "rocq-mathcomp-reals" {= "1.18.0"}

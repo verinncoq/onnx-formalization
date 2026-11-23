@@ -1,0 +1,12 @@
+; Parser.v is generated from Parser.vy on every build; it is never committed.
+(rule
+ (targets Parser.v)
+ (deps Parser.vy)
+ (action (run menhir --coq %{deps})))
+
+; The VNN-LIB query parser. Stdlib and MenhirLib only: no mathcomp.
+(rocq.theory
+ (name ONNXFormalization.VNNLIB.Parser)
+ (theories Stdlib MenhirLib)
+ (flags :standard -w -deprecated-from-Coq)
+ (package onnxformalization))
