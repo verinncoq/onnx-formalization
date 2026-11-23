@@ -1,0 +1,89 @@
+-- This is the LBNF grammar for the VNNLib language
+
+-- Defines the version number of VNNLIB. 
+-- The '<' and '>' characters are used so it doesn't clash with the Number token
+position token VersionToken '<' digit+ '.' digit+ '>' ;
+-- Defines a numeric literal
+position token Number '-'? digit+ ('.' digit+)? ;
+-- The regular expression for allowed Variable names - tensors, or networks
+position token VariableName letter (letter|digit|'_')* ;
+-- The ONNX name associated with a tensor. Bounded by double quotes
+token OnnxString '"' ((char - ["\"\\"]) | ('\\' ["\"\\nt"]))* '"';
+
+-- Sequence of integers to represent Tensor shape/indices
+separator nonempty Number "," ;
+
+-- Production of Tensor Shape
+-- Empty shape is allowed for scalar tensors
+ScalarDims.     TensorShape ::= "[" "]" ;
+TensorDims.     TensorShape ::= "[" [Number] "]" ;
+
+-- The base case of ArithExpr is a numeric value or a tensor element
+-- A variable refers to a tensor element, constructed with the associated variable name and tensor indices
+ScalarVarExpr.  ArithExpr   ::= VariableName ;
+TensorVarExpr.  ArithExpr   ::= VariableName "[" [Number] "]" ;
+ValExpr.        ArithExpr   ::= Number ;
+
+-- An arithmetic operator is a unary or binary operator that performs an arithmetic operation
+-- Operations can be defined with an arbitrary number of inputs which are left associative.
+Negate.         ArithExpr   ::= "(" "-" ArithExpr  ")" ;
+Plus.           ArithExpr   ::= "(" "+" [ArithExpr] ")";
+Minus.          ArithExpr   ::= "(" "-" ArithExpr [ArithExpr] ")" ;
+Multiply.       ArithExpr   ::= "(" "*" [ArithExpr] ")" ;
+separator nonempty ArithExpr "" ;
+
+-- A comparative operator is a binary operator that compares two inputs
+GreaterThan.    BoolExpr   ::= "(" ">" ArithExpr ArithExpr ")" ;
+LessThan.       BoolExpr   ::= "(" "<" ArithExpr ArithExpr ")" ;
+GreaterEqual.   BoolExpr   ::= "(" ">=" ArithExpr ArithExpr ")" ;
+LessEqual.      BoolExpr   ::= "(" "<=" ArithExpr ArithExpr ")" ;
+NotEqual.       BoolExpr   ::= "(" "!=" ArithExpr ArithExpr ")" ;
+Equal.          BoolExpr   ::= "(" "==" ArithExpr ArithExpr ")";
+
+-- A connective (or logical) operator is an n-ary operator that combines multiple Boolean formulas
+And.            BoolExpr   ::= "(" "and" [BoolExpr] ")" ;
+Or.             BoolExpr   ::= "(" "or" [BoolExpr] ")" ;
+separator nonempty BoolExpr "" ;
+
+-- An assertion is a constraint that must be satisfied by the model. 
+Assert.         Assertion   ::= "(assert" BoolExpr ")" ;
+separator nonempty Assertion "" ;
+
+-- A tensor element is a generic scalar variable of type 'Real', or a type defined by ONNX
+-- https://github.com/onnx/onnx/blob/main/docs/IR.md#tensor-element-types
+DType.          ElementType ::= VariableName ; 
+-- The ONNX name associated with a tensor. Bounded by double quotes
+NodeName.       OnnxName    ::= OnnxString ;
+
+-- A tensor definition consists of the variable name, element type, and shape
+InputDef.       InputDefinition  ::= "(declare-input" VariableName ElementType TensorShape ")" ;
+OutputDef.      OutputDefinition ::= "(declare-output" VariableName ElementType TensorShape ")" ;
+
+-- Hidden definitions have a mandatory ONNX name
+HiddenDef.      HiddenDefinition ::= "(declare-hidden" VariableName ElementType TensorShape OnnxName ")" ;
+
+separator nonempty InputDefinition "" ;
+separator HiddenDefinition "" ;
+separator nonempty OutputDefinition "" ;
+
+-- This statement declares that a network has the same structure as another.
+IsomorphicTo.   NetworkEquivalence ::= "(isomorphic-to" VariableName ")" ;
+-- This statement declares that two networks have identical structures and weights.
+EqualTo.        NetworkEquivalence ::= "(equal-to" VariableName ")" ;
+-- A network should have only one of these statements, but this is not enforced here for brevity
+separator NetworkEquivalence "" ;
+
+-- A network definition declares a neural network with an associated name, optional congruence statement/s, and input, hidden and output tensor definitions
+NetworkDef.     NetworkDefinition ::= "(declare-network" VariableName [NetworkEquivalence] [InputDefinition] [HiddenDefinition] [OutputDefinition] ")" ;
+separator nonempty NetworkDefinition "" ;
+
+-- The version of the VNN-LIB query being used that follows <breaking>.<non-breaking> version numbering
+VNNLibVersion.  Version         ::= "(vnnlib-version" VersionToken ")" ;
+
+-- A query is a series of network definitions followed by a series of assertions
+VNNLibQuery.    Query           ::= Version [NetworkDefinition] [Assertion] ;
+
+-- A comment starts with a semicolon
+comment ";" ;
+
+entrypoints Query ;
