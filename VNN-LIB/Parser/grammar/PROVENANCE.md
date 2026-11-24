@@ -29,3 +29,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Upstream fixes
+- Zero assertions: grammar.cf v2.0.0 requires at least one assertion, the PDF allows zero.
+  Upstream will change grammar.cf to accept zero
+  (https://github.com/VNNLIB/VNNLIB-Standard/issues/187). We follow when it is tagged.
